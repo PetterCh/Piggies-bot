@@ -1,0 +1,1 @@
+Coloca aquí tus GIF/WEBP locales y referencia como "assets/archivo.gif" en data/media.json

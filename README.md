@@ -1,0 +1,235 @@
+# 🪙 Coinks Bot v7
+
+**v7 = tu versión estable v4 + únicamente los 7 cambios pedidos.** Sin `canvas`, sin paperdoll y sin `interactions/`: todo el equipo se muestra con emojis y texto. Los botones persistentes viven **dentro del archivo del comando** que los crea, y si alguna vez hay un componente duplicado el bot te dice exactamente qué dos archivos lo declaran.
+
+## Qué cambió respecto a la v4
+
+| # | Cambio | Dónde |
+|---|--------|-------|
+| 1 | Comandos de configuración solo para admins (**Gestionar servidor**): canal de la tienda de expedición, republicar, etc. | `utils/permissions.js`, `/set-expedition-shop-channel` |
+| 2 | **Eventos programados** (inicio y fin automáticos) y **rol a mencionar** al empezar y terminar | `/evento-admin programar`, `/set-ping-role tipo:eventos` |
+| 3 | **Arte por zona** en `media.json` (`expedition.start.<zona>`, `expedition.survive.<zona>`, `expedition.die.<zona>`; `expedicion.*` es alias) | `utils/media.js`, `data/media.json` |
+| 4 | **Un solo `/inventario`**: ver, equipar, vender, fusionar, recetas | `commands/games/inventario.js`, `services/inventory.js` |
+| 5 | **Canal de log de compras** (tienda, NFT y Tienda de Expedición; las destacadas resaltan) | `/set-purchases-channel`, `services/purchaseLog.js` |
+| 6 | **Auto-roles por botones** (eventos, drops, novedades) sin `@everyone` | `/autoroles`, `/set-ping-role` |
+| 7 | **Limpieza:** retirados `/evento`, `/tienda` (ver/comprar/compras), `/tienda-expedicion` y los subcomandos de inventario dentro de `/expedicion` | ver tabla de abajo |
+
+**Fuera de esta versión (a propósito):** la animación de apertura de cajas estilo Counter-Strike. Quedó fuera porque pediste "únicamente" estos puntos; `/lootbox` es exactamente el de la v4. Se puede añadir después como cambio aparte.
+
+## Actualizar desde la v4 (importante)
+
+1. Copia de seguridad (código y base de datos).
+2. **Borra la carpeta vieja del bot y copia esta COMPLETA**, conservando solo tu `.env`. No mezcles archivos: un `tienda.js` o `interactions/` viejo junto a los nuevos es la causa típica del error *Componente duplicado*.
+3. `npm install` → **`npm run deploy`** (reemplaza la lista completa y Discord borra los comandos retirados) → `npm start`.
+4. No hay migración: los campos nuevos (`eventsRoleId`, `dropsRoleId`, `shopRoleId`, `purchasesChannelId`, tipo NFT de artículo, `RolePanel`, estados de evento `scheduled`/`cancelled`) se crean solos y los datos de la v4 siguen válidos.
+5. Configura lo que quieras: `/set-expedition-shop-channel`, `/set-purchases-channel`, `/autoroles`, `/set-ping-role`.
+
+## Comandos
+
+- **Jugadores:** `/coinks-saldo`, `/coinks-transferir`, `/juego-colores`, `/expedicion` (enviar, estado, cancelar), `/inventario` (ver, equipar, vender, fusionar, recetas), `/lootbox`, `/idioma`.
+- **Admins** (Gestionar servidor): `/set-store-channel`, `/set-expedition-shop-channel`, `/set-events-channel`, `/set-logs-channel`, `/set-purchases-channel`, `/set-ping-role`, `/autoroles`, `/evento-admin`, `/tienda-admin`, `/lootbox-admin`, `/sorteo`, `/coinks-dar`, `/coinks-airdrop`, `/nft-registrar`, `/verificacion-panel`, `/wallet-desvincular`.
+- **Solo dueño/Administrador:** `/set-admin-role`.
+
+| Retirado | Dónde queda la función |
+|---|---|
+| `/evento` | Avisos en el canal de eventos (con mención al rol). Gestión en `/evento-admin` |
+| `/tienda ver/comprar/compras` | Botón *Comprar* de cada tarjeta del canal de `/set-store-channel`; historial en el log de compras |
+| `/tienda-expedicion` | Botón del panel de `/set-expedition-shop-channel` |
+| `/expedicion equipar/inventario/recetas` | `/inventario equipar/ver/recetas`. Si Discord aún muestra uno viejo, el bot responde que se movió (se limpia con `npm run deploy`) |
+
+## 1. Permisos: "Gestionar servidor"
+
+Pueden administrar: el dueño, quien tenga *Administrador*, quien tenga **Gestionar servidor** y los roles autorizados con `/set-admin-role` (solo dueño/Administrador puede autorizar roles). Los comandos se registran con permiso por defecto *Gestionar servidor* (Discord los oculta al resto) y el bot lo vuelve a comprobar al ejecutar: comandos, autocompletados y botones, de forma centralizada en `events/interactionCreate.js`. Para exigir solo *Administrador*, cambia `ManageGuild` por `Administrator` en `utils/permissions.js` y en los `setDefaultMemberPermissions`. Los botones de usuario (comprar, sorteos, wallets, auto-roles, inventario) son públicos a propósito. Discord no deja que un bot cambie la visibilidad de sus comandos: para que un rol de `/set-admin-role` los *vea*, permítelos una vez en *Ajustes → Integraciones → tu bot*.
+
+**Tienda de expedición:** `/set-expedition-shop-channel canal:#tienda` la publica y la mantiene sola (rota cada 12 h, stock en vivo). `republicar:true` la vuelve a publicar en el canal ya configurado; `desactivar:true` la quita.
+
+## 2. Eventos programados y rol a mencionar
+
+- `/evento-admin programar tipo:Tormenta de Sangre en:3h` (o `fecha:2026-10-12 18:30` en **UTC**; `horas:` fija la duración, si no se usa la del evento; máx. 90 días). Empieza y termina solo, con anuncio y mención, y sobrevive a reinicios. Se rechazan horarios que choquen con otro evento activo o programado.
+- `/evento-admin programados` lista, `cancelar-programado` anula, `iniciar` lanza uno ya, `terminar` cierra el activo.
+- `/set-ping-role tipo:eventos rol:@Eventos` → se menciona a ese rol al **empezar** y al **terminar** (sin `rol`: muestra el actual; `quitar:true`: lo borra). El rol debe ser *mencionable* o el bot necesita *Mencionar @everyone, @here y todos los roles* en el canal de eventos (el comando avisa si falta). `@everyone` (opción de `/set-events-channel`) sigue siendo opcional y solo al empezar.
+- Mientras haya un evento activo o programado, el generador automático espera; los eventos sorpresa siguen apareciendo solos cuando no hay nada programado.
+
+## 3. Arte por zona en `media.json`
+
+Orden de búsqueda (de más específica a más general):
+
+- **Inicio:** `expedition.start.<zona>` → `expedition.start`
+- **Supervivencia:** `expedition.survive.<zona>.<rareza>` → `expedition.survive.<zona>` → `expedition.survive.<rareza>` → `expedition.survive`
+- **Muerte:** `expedition.die.<zona>` → `expedition.die`
+
+Zonas: `bosque`, `cueva`, `volcan`, `ruinas`, `abismo`, `trono`. Rarezas: `common` … `legendary`. El prefijo **`expedicion.`** es alias de `expedition.` (`expedicion.start.bosque` = `expedition.start.bosque`). El fichero ya trae las claves por zona vacías (sin imagen = sin imagen). Más: `event.end.<evento>`. Formato de `media.json` más abajo.
+
+## 4. `/inventario` único
+
+| Subcomando | Qué hace |
+|---|---|
+| `ver` | Equipo, perks, mochila (los exclusivos con sus usos), estadísticas y botones **Vender** / **Fusionar** |
+| `equipar` | Equipa un objeto (bloqueado mientras el cerdito está de expedición) |
+| `vender objeto cantidad|todos` | Venta con confirmación; los exclusivos no se venden |
+| `fusionar` | Categoría → objetos → confirmación (tarifa y % de éxito visibles) |
+| `recetas` | Precios de venta y recetas de fusión |
+
+Todo es atómico sobre saldo e inventario (`services/inventory.js`); comandos y botones llaman a las mismas funciones. Los objetos se muestran con emoji de rareza + nombre + bonus (p. ej. `🔵 Hacha Pezuña (+10%)`).
+
+## 5. Log de compras
+
+`/set-purchases-channel canal:#compras [publico:true] [desactivar:true]`. Cada compra publica comprador, precio, stock restante, entrega y, en la Tienda de Expedición, rareza, bonus, usos y perks. Salen con 🌟 las de **NFT**, las de **5000 Coinks o más** (`PURCHASE_HIGHLIGHT_MIN`) y los objetos épicos/legendarios.
+
+- **NFT en la tienda:** `/tienda-admin agregar tipo:NFT` (`contrato`, `token-id` y `red` son informativos). El comprador **necesita wallet vinculada**; el pedido queda pendiente y el log muestra la(s) wallet(s). Al enviarlo: `/tienda-admin entregar pedido:… tx:<hash>`. El bot **nunca custodia NFT ni claves**.
+- **Privacidad:** por defecto el log es para el staff (ID del comprador, wallets completas, ID de pedido). Con `publico:true`, wallets abreviadas y sin IDs.
+- Sin canal configurado, los pedidos manuales/NFT siguen avisando al canal de admins del `.env`.
+
+## 6. Auto-roles y roles de aviso
+
+1. `/autoroles crear titulo:"Avisos" descripcion:"…" [canal] [color]` publica el panel.
+2. `/autoroles agregar panel:Avisos nuevo-rol:"Avisos de eventos" emoji:🔔 ping:eventos` crea el rol (mencionable, **sin permisos**), añade su botón y lo registra como rol de aviso. También `rol:@existente`. `ping`: `eventos`, `lootbox`, `tienda`.
+3. `/autoroles quitar|eliminar|listar` (hasta 25 botones por panel, 10 paneles por servidor). Cada clic activa/desactiva el rol (respuesta privada); los botones sobreviven a reinicios.
+
+**Seguridad:** un auto-rol no puede dar permisos de moderación/administración, ni ser un rol gestionado por una integración, ni de admin del bot, ni estar por encima del rol del bot. Se comprueba al añadirlo **y en cada clic**. Un botón de un rol retirado deja de funcionar. Para `nuevo-rol` el bot necesita *Gestionar roles*.
+
+`/set-ping-role tipo:(eventos|lootbox|tienda) rol:@rol`:
+- **eventos** → al empezar y al terminar un evento.
+- **lootbox** → en premios épicos/legendarios y NFT de alto valor del canal de premios, **en vez de `@everyone`** (máx. un aviso por minuto). Sin rol se usa `@everyone` solo si lo dejaste activo en `/set-logs-channel`.
+- **tienda** → al publicar un artículo **nuevo** y cuando la Tienda de Expedición se renueva sola.
+
+---
+
+# Referencia general (heredada de la v4, sigue vigente)
+
+## Eventos globales
+
+- `/set-events-channel canal:#eventos [everyone:true]` los activa. El primero llega entre 2 y 24 h después; tras cada evento, el siguiente aparece pasadas entre **8 y 72 h** (`events.minGapHours/maxGapHours` en `config.js`) y dura 2-6 h según el tipo. Es totalmente automático y sobrevive a reinicios (todo está en MongoDB).
+- Efectos (`data/events.js`): Tormenta de Sangre −15% supervivencia y Coinks ×1,5; Lluvia de Estrellas +10% y ×1,25; Fiebre del Oro Coinks ×2; Niebla Espectral −5% y ×1,15. Cada expedición exitosa tiene una probabilidad (15-25%) de soltar un **objeto único del evento** (rareza `event`, 3 por evento, perks de +Coinks o "sobrevivir a la muerte", 15 usos, no vendibles ni fusionables).
+- Cada premio de evento se anuncia en el canal de eventos **mencionando al ganador**.
+
+## Tienda de Expedición rotativa
+
+- `/set-expedition-shop-channel canal:#tienda-expedicion` publica un **panel**: cabecera + una tarjeta por objeto (imagen opcional, stats, usos, precio, stock y botón *Comprar*). Cada **12 h** (`EXPSHOP_ROTATION_HOURS`, 2 rotaciones al día) el bot borra el panel anterior y publica un escaparate nuevo de **10 objetos** (2 comunes, 2 poco comunes, 3 raros, 2 épicos, 1 legendario; arma/armadura/casco al azar y sin repetir los de la rotación anterior). El stock se actualiza solo con cada compra.
+- Catálogo: 30 objetos exclusivos (`data/exclusive.js`). **No caen** en expediciones, cajas, ni se pueden fusionar o vender. Stats: +6%…+32% de supervivencia según rareza (el doble que el equipo normal) y algunos con perks.
+- **Usos limitados** por rareza: común 3, poco común 5, raro 7, épico 9, legendario 11 (los de evento, 15). Se gasta **1 uso por expedición completada** (las canceladas no gastan). Al llegar a 0 el objeto se rompe y se avisa en el resultado.
+- Precio / stock por rotación y servidor: 300/8, 700/6, 1.800/4, 4.500/2 y 11.000/1 Coinks (`SHOP_PRICE`/`SHOP_STOCK`). **Máximo 1 unidad por persona y rotación** (para que un solo jugador no acapare). La compra es atómica (reserva de stock → cobro → entrega, con reversión si algo falla).
+- Se compra con el botón de cada tarjeta del panel (no hay comando manual).
+- Equipar: el equipo **se bloquea mientras el cerdito está de expedición** (así el equipo y los usos del resultado son los que salieron). Si olvidaste algo: cancela.
+- Imágenes: `data/media.json` → `expshop.header`, `expshop.rarity.<rareza>` y `expshop.item.<id>` (por objeto).
+
+## Cancelar una expedición
+
+`/expedicion cancelar` (con confirmación). Coste = `12 × multiplicador de recompensa × (0,4 + 0,6 × fracción de tiempo transcurrido)`, mínimo 5: **cuanto antes canceles, menos pagas**. El cerdito vuelve sin botín y sin gastar usos; luego puedes equipar y reenviar. Si la expedición termina en ese instante, se te devuelve el cobro. Ajustable en `CANCEL` (`data/gameData.js`).
+
+## Zonas, dificultad y recompensas
+
+Recompensa de Coinks = rango de la rareza × `rewardMult`, con `rewardMult = (minutos / 10) × dificultad`:
+
+| Zona | Duración | Dificultad | rewardMult | Superv. base | Eficacia equipo normal |
+|---|---|---|---|---|---|
+| Bosque Embarrado | 10 min | 1,0 | ×1 | 70% | 100% |
+| Cueva Oscura | 30 min | 1,15 | ×3,45 | 55% | 100% |
+| Volcán Jamonero | 1 h | 1,3 | ×7,8 | 40% | 90% |
+| Ruinas Malditas | 4 h | 1,4 | ×33,6 | 25% | 70% |
+| Abismo Eterno | 12 h | 1,6 | ×115,2 | 12% | 50% |
+| Trono del Dragón | 1 día | 1,8 | ×259,2 | 5% | 35% |
+
+El equipo **normal** rinde cada vez menos en las zonas largas (columna "eficacia") y el **exclusivo** siempre al 100%, así que con el mejor equipo normal tienes ~28% de volver del Trono y con el set legendario de la tienda ~85%. `npm run expedition:ev` imprime la tabla de supervivencias, EV de Coinks por expedición/hora, coste de cancelar y coste por uso de cada rareza para que lo balancees.
+
+> **Cambios que afectan al balance:** las zonas existentes (Cueva y Volcán) ahora pagan ×3,45 y ×7,8 (antes pagaban lo mismo que el Bosque). Las expediciones ya en curso al actualizar se resuelven con las reglas nuevas. Las zonas largas pagan mucho (la suerte de rareza sube con la dificultad, así que el reparto real crece algo más rápido que tiempo × dificultad): vigila la inflación con el libro contable y ajusta `difficulty`/`luck` en `ZONES`; con `luck: 1` el pago es estrictamente `tiempo × dificultad`.
+
+## Tienda en un canal (estilo Drip)
+
+1. `/set-store-channel canal:#tienda` → el bot comprueba sus permisos y publica una tarjeta por artículo (ordenadas por precio).
+2. `/tienda-admin agregar` ahora acepta `imagen` (URL `https://` estable: tu CDN o un host de imágenes; los enlaces de adjuntos de Discord caducan). `/tienda-admin editar` permite cambiar precio, stock, descripción, imagen y visibilidad.
+3. Cada compra, reembolso o edición actualiza la tarjeta (stock, *Agotado* con botón desactivado). Si ocultas un artículo, su tarjeta se borra. Si borras una tarjeta a mano, el bot la republica en el siguiente cambio. `/tienda-admin refrescar` reconstruye todo.
+4. Cambiar de canal borra las tarjetas del canal anterior. `/set-store-channel desactivar:true` las quita todas. Se compra solo con el botón de la tarjeta.
+
+## Logs de lootboxes
+
+`/set-logs-channel canal:#premios everyone:true minimo:Todos` anuncia cada premio (las cajas vacías no se anuncian). `minimo` filtra por rareza; los NFT siempre se anuncian. `@everyone` solo en premios **épicos o legendarios** y **NFT de alto valor** (`/lootbox-admin nft-agregar alto-valor:true`, por defecto sí), con un máximo de **un ping por minuto y servidor** para evitar spam. El bot necesita el permiso *Mencionar @everyone* en ese canal; si falta, anuncia sin ping y te avisa al configurarlo. Los avisos privados para admins (pedidos de tienda, NFT por entregar) siguen yendo a `ADMIN_LOG_CHANNEL_ID`.
+
+## Arsenal
+
+`data/arsenal.js` es la fuente única: 10 armas y 10 armaduras por rareza (cada una con su bonus de supervivencia dentro de la banda de su rareza, y nombres ES/EN) más 1 casco por rareza. Los objetos de versiones anteriores **conservan su id y bonus**, así que los inventarios guardados siguen válidos. Al caer un objeto se elige primero la ranura (40% arma, 40% armadura, 20% casco, editable en `DROP_SLOT_WEIGHTS`) y luego un modelo al azar de esa rareza. Para añadir objetos: una fila `[id, nombreES, nombreEN]` en su grupo; `npm run check:i18n` valida que haya al menos 10 por tipo y rareza.
+
+> Pediste cuatro rarezas (Común, Raro, Épico, Legendario); el juego ya tenía también *Poco común*, así que la rareza intermedia también tiene sus 10 + 10 en vez de quitarla (habría roto inventarios existentes).
+
+## Venta y fusión
+Desde `/inventario` (subcomandos o botones **Vender** / **Fusionar**); `/inventario recetas` muestra precios y recetas.
+
+- **Vender:** eliges el objeto y vendes 1 o todos los del mismo modelo. Precio por rareza: 8 / 25 / 80 / 250 / 800 Coinks (`SELL_PRICE`). La operación es atómica (no se puede vender dos veces la misma copia).
+- **Fusionar:** N objetos del **mismo tipo y rareza** → 1 objeto aleatorio de la **rareza siguiente** (mismo tipo). Escala así (`FUSION` en `data/gameData.js`):
+
+| Fusión | Objetos | Modelos distintos | Tarifa | Éxito |
+|---|---|---|---|---|
+| Común → Poco común | 3 | 1 | 0 | 100% |
+| Poco común → Raro | 4 | 2 | 50 | 90% |
+| Raro → Épico | 5 | 3 | 300 | 75% |
+| Épico → Legendario | 6 | 4 | 1500 | 60% |
+
+Si falla, se pierden los objetos y se devuelve el 50% de su valor de venta; la tarifa siempre se cobra. Para quitar el riesgo pon `chance: 1`. Los cascos (1 modelo por rareza) piden como máximo ese único modelo. Eliges tú qué copias consumir (el menú muestra primero un ejemplar de cada modelo para poder cumplir la variedad). El consumo de objetos y el cobro son **una sola operación atómica** contra tu saldo e inventario. Los Coinks y objetos quedan registrados en el libro contable (`item_sell`, `fusion_fee`, `fusion_consolation`).
+
+## Primeros pasos con lo nuevo
+
+- **Panel de wallets:** `/verificacion-panel` en el canal elegido. Los botones sobreviven a reinicios.
+- **Desvincular:** `/wallet-desvincular usuario:@x direccion:(autocompleta) motivo:...`
+- **Tienda:** `/tienda-admin agregar` (tipo *Rol* = entrega automática; *Manual* = pedido pendiente que un admin entrega con `/tienda-admin entregar`). Los pedidos manuales avisan en `ADMIN_LOG_CHANNEL_ID`.
+- **Sorteos:** `/sorteo crear duracion:2h premio-coinks:500 ganadores:3 costo:50` (el costo es opcional; 0 = gratis). Se cierran solos y sobreviven a reinicios.
+- **NFT como premio de caja:** `/lootbox-admin nft-agregar` (1 registro = 1 NFT). Cuando alguien lo gana, queda reservado y se avisa a los admins; **tú lo envías a mano** a la wallet vinculada del ganador y lo marcas con `/lootbox-admin nft-entregar`. El bot **nunca custodia NFTs ni claves privadas**.
+- **Balance de cajas:** edita `data/lootboxes.js` y ejecuta `npm run lootbox:ev` para ver probabilidades y retorno esperado antes de publicar. `/lootbox probabilidades` las muestra a los jugadores.
+
+## GIF / WEBP
+
+Edita `data/media.json` (se recarga sin reiniciar). Cada clave admite varias entradas; se elige una al azar:
+
+```json
+"lootbox.legendary": ["https://tu-cdn.com/legendario.gif", "assets/lootbox/legendary.webp"]
+```
+
+- `https://…` se usa directo en el embed. `assets/…` adjunta un archivo local (solo dentro de `/assets`).
+- Claves: `colorgame.start|win|lose`, `expedition.start[.zona]|survive[.zona][.rareza]|die[.zona]`, `lootbox.opening|common|uncommon|rare|epic|legendary|nft|nothing`, `giveaway.end`.
+- Las más específicas tienen prioridad (`expedition.die.volcan` antes que `expedition.die`). Las vacías simplemente no muestran imagen.
+- Usa enlaces estables (tu propio CDN o un archivo subido a Discord); los enlaces de buscadores de GIFs pueden caducar. Los GIF pesados (>8 MB) pueden no animarse en el embed.
+
+## Idiomas y frases
+
+`interaction.t('clave', { vars })` en todos los comandos. Prioridad: `/idioma` → idioma del cliente de Discord del usuario → idioma preferido del servidor → `DEFAULT_LANG`. Los avisos sin interacción (expedición que regresa, sorteo que termina) usan el idioma guardado al iniciarlos.
+
+Los valores que son arrays en `locales/*.js` se eligen al azar: añade líneas para tener más variedad (por ejemplo `expedition.death.volcan`). Para una zona nueva, añade `zone.<id>`, `expedition.death.<id>` y `expedition.survive.<id>`. `npm run check:i18n` valida que ES y EN tengan las mismas claves y que no falte ninguna usada en el código.
+
+
+## Estructura
+
+```
+index.js · deploy-commands.js · config.js
+migrations/001-v2.js            # migración idempotente al arrancar
+models/                         # User, Ledger, WalletLink, NftCollection, Expedition, ExpShopRotation, GameEvent, GuildConfig,
+                                # ShopItem, ShopPurchase, Giveaway, NftPrize, LootboxLog, RolePanel, AuditLog
+data/                           # gameData, arsenal, exclusive, events, lootboxes, media.json
+locales/                        # es.js, en.js
+utils/                          # economy, i18n, media, blockchain, confirm, permissions, adminLog, guildConfig, loader, helpers
+services/                       # nftSync, expeditions, inventory, shop, storeSync, expShop, events, purchaseLog, autoroles, giveaways, lootbox, lootboxLog
+tasks/                          # nftSyncTask, expeditionTask, giveawayTask, eventTask, expShopTask
+events/                         # ready, interactionCreate (router + permisos)
+commands/economy/ · commands/games/ · commands/nft/
+scripts/                        # lootbox-ev, expedition-ev, check-i18n, migrate
+```
+
+Un comando puede declarar `components: [{ kind: 'button'|'modal'|'select', prefix, execute }]` (customId `prefijo:arg1:arg2`); el loader los registra solo. Aquí: `shop` (set-store-channel), `xshop` (set-expedition-shop-channel), `ar` (autoroles), `inv` (inventario), `gw` (sorteo), `lb` (lootbox), `wl` (verificacion-panel).
+
+## Instalación desde cero
+
+Node.js 18.17+ (recomendado 20+). MongoDB Atlas: crea cluster, usuario y permite tu IP en *Network Access*. Discord Developer Portal: crea el bot, activa **Server Members Intent**, copia token y Application ID, e invítalo con `https://discord.com/oauth2/authorize?client_id=CLIENT_ID&scope=bot%20applications.commands&permissions=268454912`. Sube el rol del bot por encima de los roles que vaya a gestionar.
+
+```bash
+npm install
+cp .env.example .env      # rellena token, CLIENT_ID, GUILD_ID, MONGODB_URI, RPCs...
+npm run deploy
+npm start
+```
+
+## Notas de seguridad y límites
+
+- **El panel de wallets no prueba que seas el dueño de la dirección** (Collab.Land sí, porque pide firmar un mensaje en una web). Aquí cualquiera puede escribir la dirección pública de otra persona. Mitigaciones incluidas: confirmación, una wallet = una cuenta, y `/wallet-desvincular` para corregir suplantaciones. Si los roles o los NFT premio tienen valor real, añade verificación por firma (SIWE) en el punto `onModalSubmit` de `verificacion-panel.js`.
+- Los NFT premio exigen wallet vinculada y se entregan manualmente. Antes de entregar, comprueba la wallet y, si te preocupa la suplantación, verifica al ganador por otra vía.
+- Las cajas son una mecánica de azar con premios de valor real (NFT). Si algún día los Coinks se pueden comprar con dinero, revisa la normativa de *loot boxes* de tus países. Las probabilidades son públicas con `/lootbox probabilidades`.
+- Roles por rasgo: requieren contratos ERC721Enumerable y metadatos accesibles. Ronin se trata como EVM. Usa RPC propios (Alchemy, Infura…).
+- Las URIs de metadatos las define el contrato: el bot hace peticiones HTTP a ellas. Registra solo colecciones en las que confíes.
+- Los premios en Coinks de sorteos se pagan como máximo una vez por ganador, incluso si el bot se reinicia a mitad del reparto (en un caso extremo podría quedar sin pagar uno; el error se registra en consola).

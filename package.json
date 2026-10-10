@@ -1,0 +1,25 @@
+{
+  "name": "coinks-bot",
+  "version": "7.0.0",
+  "description": "Bot de Discord: NFTs, economía Coinks y minijuegos",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "deploy": "node deploy-commands.js",
+    "migrate": "node scripts/migrate.js",
+    "lootbox:ev": "node scripts/lootbox-ev.js",
+    "check:i18n": "node scripts/check-i18n.js",
+    "expedition:ev": "node scripts/expedition-ev.js"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "discord.js": "^14.17.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0",
+    "mongoose": "^8.5.0",
+    "node-cron": "^3.0.3"
+  }
+}
