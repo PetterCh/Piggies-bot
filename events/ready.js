@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const nftSyncTask = require('../tasks/nftSyncTask');
+const tokenOwnersTask = require('../tasks/tokenOwnersTask');
 const expeditionTask = require('../tasks/expeditionTask');
 const giveawayTask = require('../tasks/giveawayTask');
 const eventTask = require('../tasks/eventTask');
@@ -11,6 +12,7 @@ module.exports = {
   execute(readyClient) {
     console.log(`✅ Conectado como ${readyClient.user.tag}`);
     nftSyncTask.start(readyClient);
+    tokenOwnersTask.start(readyClient);
     expeditionTask.start(readyClient);
     giveawayTask.start(readyClient);
     eventTask.start(readyClient);

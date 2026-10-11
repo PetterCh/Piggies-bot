@@ -41,9 +41,9 @@ async function evaluateWallets(collections, addresses) {
 
   for (const address of addresses) {
     for (const col of collections) {
-      const needTraits = col.traitRoles.length > 0;
+      const needTraits = col.traitRoles.length > 0; // metadatos SOLO si hay reglas por rasgo/categoría
       try {
-        const { count, tokens } = await getHoldings(col, address, needTraits);
+        const { count, tokens } = await getHoldings(col, address, { needAttrs: needTraits });
         if (count > 0 && col.holderRoleId) desired.add(col.holderRoleId);
         for (const rule of col.traitRoles) {
           if (tokens.some((t) => matchesRule(rule, t.attrs))) desired.add(rule.roleId);
@@ -55,7 +55,8 @@ async function evaluateWallets(collections, addresses) {
       }
     }
   }
-  // Roles por token ID concreto (JSON externo): se SUMAN a los de holder y rasgo, nunca los reemplazan.
+
+  // Roles por Token ID (JSON externo): lectura INTERNA (MongoDB), sin blockchain. Se SUMAN a holder y rasgos.
   const byToken = await tokenRoles.evaluateTokenRoles(collections, addresses);
   byToken.desired.forEach((r) => desired.add(r));
   byToken.failed.forEach((r) => failed.add(r));

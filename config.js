@@ -32,11 +32,18 @@ module.exports = {
   nft: {
     cron: process.env.NFT_SYNC_CRON || '0 3 * * *',
     timezone: process.env.CRON_TIMEZONE || 'UTC',
-    maxTokensPerWallet: 300,
-    concurrency: 5,
+    maxTokensPerWallet: 300, // con metadatos (reglas por rasgo)
+    maxIdsPerWallet: 3000, // solo IDs (roles por Token ID), sin metadatos
+    concurrency: Number(process.env.NFT_RPC_CONCURRENCY) || 3, // lecturas RPC simultáneas; bájalo si tu proveedor limita (400/429)
     walletConcurrency: 3,
     metadataTimeoutMs: 8000,
     ipfsGateway: 'https://ipfs.io/ipfs/',
+    // Índice interno de Token IDs (roles 1/1): el bot lo llena solo, en segundo plano y muy despacio (ver services/tokenOwners.js).
+    tokenOwners: {
+      auto: process.env.TOKEN_OWNERS_AUTO !== 'off', // TOKEN_OWNERS_AUTO=off lo desactiva (solo import/actualizar manual)
+      cron: process.env.TOKEN_OWNERS_CRON || '30 2 * * *', // refresco diario, antes de la sincronización de las 03:00
+      delayMs: Number(process.env.TOKEN_OWNERS_DELAY_MS) || 400, // pausa entre lecturas
+    },
   },
 
   colorGame: { defaultEntry: 100, minEntry: 1, maxEntry: 100000, lobbySeconds: 30, minPlayers: 2, roundDelayMs: 3000 },

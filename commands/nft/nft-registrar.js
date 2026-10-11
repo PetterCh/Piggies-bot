@@ -3,6 +3,7 @@ const NftCollection = require('../../models/NftCollection');
 const { normalizeAddress, verifyContract, ANY_VALUE } = require('../../utils/blockchain');
 const { syncGuild, getGuildCollections } = require('../../services/nftSync');
 const tokenRoles = require('../../services/tokenRoles');
+const tokenOwners = require('../../services/tokenOwners');
 const { UserError, escapeRegex } = require('../../utils/helpers');
 
 function assertRoleUsable(t, guild, role) {
@@ -45,6 +46,11 @@ module.exports = {
     .addSubcommand((s) => s.setName('eliminar').setDescription('Elimina una colección (los roles ya otorgados NO se quitan)')
       .addStringOption((o) => o.setName('coleccion').setDescription('Nombre o contrato').setRequired(true)))
     .addSubcommand((s) => s.setName('token-roles').setDescription('Muestra los roles por Token ID (JSON externo) y si están bien configurados'))
+    .addSubcommand((s) => s.setName('tokens-importar').setDescription('Carga el índice interno token→wallet desde un archivo CSV/JSON (sin usar la blockchain)')
+      .addStringOption((o) => o.setName('coleccion').setDescription('Nombre o contrato de la colección').setRequired(true))
+      .addAttachmentOption((o) => o.setName('archivo').setDescription('CSV (token_id,wallet) o JSON con los dueños actuales').setRequired(true)))
+    .addSubcommand((s) => s.setName('tokens-actualizar').setDescription('Refresca el índice leyendo la cadena MUY despacio (solo los IDs de los grupos)')
+      .addStringOption((o) => o.setName('coleccion').setDescription('Nombre o contrato de la colección').setRequired(true)))
     .addSubcommand((s) => s.setName('sincronizar').setDescription('Fuerza ahora la sincronización de roles de este servidor')),
 
   async execute(interaction) {
@@ -109,16 +115,51 @@ module.exports = {
           const { groups } = tokenRoles.loadGroups();
           const { resolved, problems } = tokenRoles.resolveGroups(cols);
           const ok = new Set(resolved.map((g) => g.ref));
+          const cover = new Map();
+          for (const g of resolved) {
+            const owners = await tokenOwners.ownersFor(g.col, g.tokenIds);
+            const last = Math.max(0, ...[...owners.values()].map((x) => new Date(x.updatedAt).getTime() || 0));
+            cover.set(g.ref, { have: owners.size, total: g.tokenIds.length, last });
+          }
           const lines = groups.map((g) => {
             const role = guild.roles.cache.get(g.roleId);
             const state = !ok.has(g.ref) ? '⚠️' : role?.editable ? '✅' : '❌';
-            return `${state} **${g.ref}** · ${g.collection || '—'} · ${t('nft.tokenRoles.count', { n: g.tokenIds.length })} → ${role ? `<@&${role.id}>` : `\`${g.roleId}\` ${t('nft.tokenRoles.noRole')}`}${role && !role.editable ? ` (${t('nft.tokenRoles.hierarchy')})` : ''}`;
+            return `${state} **${g.ref}** · ${g.collection || '—'} · ${t('nft.tokenRoles.count', { n: g.tokenIds.length })} → ${role ? `<@&${role.id}>` : `\`${g.roleId}\` ${t('nft.tokenRoles.noRole')}`}${role && !role.editable ? ` (${t('nft.tokenRoles.hierarchy')})` : ''}${cover.has(g.ref) ? `\n　${t('nft.tokenRoles.index', { have: cover.get(g.ref).have, total: cover.get(g.ref).total })}${cover.get(g.ref).last ? ` · <t:${Math.floor(cover.get(g.ref).last / 1000)}:R>` : ''}` : ''}`;
           });
           const embed = new EmbedBuilder().setTitle(t('nft.tokenRoles.title')).setColor(0x5865f2)
             .setDescription((lines.join('\n') || t('nft.tokenRoles.none')).slice(0, 3900));
           if (problems.length) embed.addFields({ name: t('nft.tokenRoles.problems'), value: problems.map((x) => `• ${x}`).join('\n').slice(0, 1000) });
           embed.setFooter({ text: t('nft.tokenRoles.footer') });
           return interaction.editReply({ embeds: [embed] });
+        }
+        case 'tokens-importar': {
+          const col = await findCollection(t, guild.id, interaction.options.getString('coleccion', true));
+          const file = interaction.options.getAttachment('archivo', true);
+          if (file.size > 2 * 1024 * 1024) throw new UserError(t('nft.tokenOwners.tooBig'));
+          let parsed;
+          try {
+            const res = await fetch(file.url, { signal: AbortSignal.timeout(15_000) });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            parsed = tokenOwners.parseSnapshot(await res.text());
+          } catch (err) {
+            throw new UserError(t('nft.tokenOwners.fileFail', { error: err.message }));
+          }
+          if (!parsed.rows.length) throw new UserError(t('nft.tokenOwners.empty'));
+          const n = await tokenOwners.saveRows(col, parsed.rows, 'import');
+          const wanted = new Set(tokenRoles.resolveGroups(await getGuildCollections(guild.id)).resolved.filter((g) => g.col.id === col.id).flatMap((g) => g.tokenIds));
+          const covered = parsed.rows.filter((r) => wanted.has(r.tokenId)).length;
+          return interaction.editReply(t('nft.tokenOwners.imported', { n, name: col.name, covered, wanted: wanted.size })
+            + (parsed.bad.length ? `\n${t('nft.tokenOwners.bad', { n: parsed.bad.length, sample: parsed.bad.slice(0, 3).join(' | ') })}` : ''));
+        }
+        case 'tokens-actualizar': {
+          const col = await findCollection(t, guild.id, interaction.options.getString('coleccion', true));
+          const ids = tokenRoles.resolveGroups(await getGuildCollections(guild.id)).resolved.filter((g) => g.col.id === col.id).flatMap((g) => g.tokenIds);
+          if (!ids.length) throw new UserError(t('nft.tokenOwners.noGroups', { name: col.name }));
+          await interaction.editReply(t('nft.tokenOwners.refreshing', { n: new Set(ids).size }));
+          const r = await tokenOwners.refreshFromChain(col, ids, {
+            onProgress: (done, total) => interaction.editReply(t('nft.tokenOwners.progress', { done, total })),
+          });
+          return interaction.editReply(t(r.aborted ? 'nft.tokenOwners.aborted' : 'nft.tokenOwners.refreshed', { ok: r.ok, failed: r.failed }));
         }
         case 'sincronizar': {
           await interaction.editReply(t('nft.syncing'));

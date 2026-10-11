@@ -11,7 +11,8 @@
 //   - role_id: ID del rol de Discord. Mientras sea un texto de relleno ("TU_DISCORD_ROLE_ID_AQUI") el grupo se ignora.
 const fs = require('node:fs');
 const path = require('node:path');
-const { getTokenOwners, normalizeAddress } = require('../utils/blockchain');
+const { normalizeAddress } = require('../utils/blockchain');
+const tokenOwners = require('./tokenOwners');
 
 const FILE = path.resolve(process.env.TOKEN_ROLES_FILE || path.join(__dirname, '..', 'data', 'token-roles.json'));
 const ROLE_ID_RE = /^\d{17,20}$/;
@@ -99,23 +100,18 @@ function resolveGroups(collections) {
 const managedRoleIds = (collections) => new Set(resolveGroups(collections).resolved.map((g) => g.roleId));
 
 /**
- * Roles que corresponden a un conjunto de wallets según los grupos. `failed` = roles de grupos cuya lectura falló
- * (RPC caído...): esos roles NUNCA se quitan por un fallo temporal.
+ * Roles que corresponden a un conjunto de wallets. Lee SOLO el índice interno de MongoDB (services/tokenOwners.js):
+ * no llama a la blockchain ni a metadatos. `failed` = grupos sin ningún dato en el índice: su rol NO se quita (aún no hay snapshot).
  */
 async function evaluateTokenRoles(collections, addresses) {
   const desired = new Set();
   const failed = new Set();
+  if (!addresses.length) return { desired, failed };
   const mine = new Set(addresses.map((a) => String(a).toLowerCase()));
-  if (!mine.size) return { desired, failed }; // sin wallets no hay nada que leer
-  const { resolved } = resolveGroups(collections);
-  for (const g of resolved) {
-    try {
-      const owners = await getTokenOwners(g.col, g.tokenIds);
-      if ([...owners.values()].some((o) => o && mine.has(o))) desired.add(g.roleId);
-    } catch (err) {
-      console.error(`[nft] Falló el grupo "${g.ref}" (${g.col.name}): ${err.shortMessage || err.message}`);
-      failed.add(g.roleId);
-    }
+  for (const g of resolveGroups(collections).resolved) {
+    const owners = await tokenOwners.ownersFor(g.col, g.tokenIds);
+    if (!owners.size) { failed.add(g.roleId); continue; } // sin snapshot: no tocar roles
+    if (g.tokenIds.some((id) => { const o = owners.get(id)?.owner; return o && mine.has(o); })) desired.add(g.roleId);
   }
   return { desired, failed };
 }

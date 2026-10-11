@@ -29,7 +29,7 @@ const names = {
   'rol-holder': 'holder-role', sincronizar: 'sync', sorteo: 'giveaway', terminar: 'end', tiempo: 'time',
   'tienda-admin': 'shop-admin', tipo: 'type', titulo: 'title', todas: 'all', todos: 'all', usuario: 'user',
   valor: 'value', vender: 'sell', ver: 'view', 'verificacion-panel': 'verification-panel', 'wallet-desvincular': 'wallet-unlink',
-  zona: 'zone',
+  zona: 'zone', archivo: 'file', 'tokens-importar': 'tokens-import', 'tokens-actualizar': 'tokens-refresh', 'token-roles': 'token-roles',
 };
 
 // descripción en español (tal como está en el código) -> inglés
@@ -197,6 +197,9 @@ const descriptions = {
   'Elimina una colección (los roles ya otorgados NO se quitan)': 'Delete a collection (roles already granted are NOT removed)',
   'Nombre o contrato': 'Name or contract',
   'Muestra los roles por Token ID (JSON externo) y si están bien configurados': 'Show the Token ID roles (external JSON) and whether they are set up correctly',
+  'Carga el índice interno token→wallet desde un archivo CSV/JSON (sin usar la blockchain)': 'Load the internal token→wallet index from a CSV/JSON file (no blockchain used)',
+  'CSV (token_id,wallet) o JSON con los dueños actuales': 'CSV (token_id,wallet) or JSON with the current owners',
+  'Refresca el índice leyendo la cadena MUY despacio (solo los IDs de los grupos)': 'Refresh the index reading the chain VERY slowly (only the groups\' IDs)',
   'Fuerza ahora la sincronización de roles de este servidor': "Force a role sync for this server now",
   '(Admin) Publica el panel de verificación de wallets en este canal': '(Admin) Post the wallet verification panel in this channel',
   '(Admin) Desvincula wallets de un usuario (error de tipeo o suplantación)': '(Admin) Unlink a user\'s wallets (typo or impersonation)',

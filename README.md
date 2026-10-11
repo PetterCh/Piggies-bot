@@ -1,4 +1,38 @@
-# 🪙 Coinks Bot v7.2
+# 🪙 Coinks Bot v7.4
+
+## Novedades de la v7.4: el bot llena solo el índice de Token IDs
+
+Ya no tienes que cargar nada a mano. `tasks/tokenOwnersTask.js` mantiene el índice de los grupos 1/1 en segundo plano:
+- **Primera carga:** 1 minuto después de arrancar, si faltan tokens en el índice.
+- **Refresco diario:** a las 02:30 (`TOKEN_OWNERS_CRON`, zona `CRON_TIMEZONE`), una hora antes de la sincronización de roles de las 03:00. Solo relee los tokens que faltan o tienen más de ~20 h.
+- **Muy despacio y aparte:** una lectura cada 0,4 s (`TOKEN_OWNERS_DELAY_MS`), una a la vez, con reintentos. Un fallo conserva el dato anterior; tras 10 fallos seguidos se corta y reintenta en el siguiente ciclo. Un token quemado/inexistente queda sin dueño.
+- **Si algo cambió** (primera carga o un 1/1 cambió de dueño), el bot sincroniza los roles de ese servidor automáticamente.
+- **La sincronización de roles sigue leyendo SOLO MongoDB**; la blockchain solo se toca en este refresco aislado (~108 lecturas al día con tus 3 grupos, no por usuario).
+- `TOKEN_OWNERS_AUTO=off` lo desactiva (entonces usa `tokens-importar` / `tokens-actualizar`, que siguen funcionando). Los logs de Railway muestran `[nft] Índice de Token IDs: …`.
+
+**Antes de arrancar:** pon los `role_id` reales en `data/token-roles.json` (o `TOKEN_ROLES_JSON`), registra las colecciones con `/nft-registrar coleccion` con el mismo nombre que usa el campo `coleccion` del JSON, y usa un RPC propio en `RPC_EVM_URL`/`RPC_RONIN_URL`.
+
+---
+
+# Novedades de la v7.3
+
+## Novedades de la v7.3: índice interno de Token IDs (sin blockchain)
+
+Los logs mostraban `400 Bad Request` / `missing response for request` hasta en la lectura normal de las colecciones: el **RPC público** que trae por defecto el bot (`RPC_EVM_URL`/`RPC_RONIN_URL`) limita las peticiones. Para que los grupos 1/1 no dependan de él, ahora **no consultan la cadena**: usan un índice propio guardado en MongoDB.
+
+**Cómo llenar el índice** (dos formas; la primera no toca la blockchain):
+1. **`/nft-registrar tokens-importar coleccion:Piggies archivo:<csv/json>`** — adjunta un archivo con los dueños actuales. CSV: una línea por token, `token_id,wallet` (con o sin cabecera; admite `,` `;` o tabulador). JSON: `{"3": "0x…", "853": "0x…"}` o `[{"token_id":3,"owner":"0x…"}]`. Puedes exportarlo del explorador/marketplace de tu colección (lista de holders con token ID) o de cualquier indexador. Filas con wallet inválida se ignoran y se te avisa; una wallet vacía/`null` significa «quemado/sin dueño». Máx. 2 MB. Se pueden importar solo los IDs de tus grupos o toda la colección.
+2. **`/nft-registrar tokens-actualizar coleccion:Piggies`** — lee de la cadena **solo los IDs de tus grupos**, de uno en uno, con pausa de 0,4 s y reintentos; un fallo conserva el dato anterior y se corta tras 10 fallos seguidos. Es una acción manual del admin, **nunca** parte de la sincronización.
+
+**Mantenerlo al día:** el índice es una foto; si los 1/1 cambian de dueño, vuelve a importar o ejecuta `tokens-actualizar` (puedes hacerlo cuando quieras; no corre solo). Después, `/nft-registrar sincronizar`. `/nft-registrar token-roles` muestra por grupo cuántos tokens tiene el índice y cuándo se actualizó por última vez.
+
+**Recomendación:** pon un RPC propio (Alchemy, Infura, Chainstack, QuickNode…) en `RPC_EVM_URL` / `RPC_RONIN_URL` de Railway. Aun con el índice, la lectura base de las colecciones (rol de Holder) sigue usando el RPC; las lecturas tienen reintentos con espera creciente y `NFT_RPC_CONCURRENCY` (por defecto 3) limita la simultaneidad.
+
+---
+
+# Novedades de la v7.2.1
+
+> **v7.2.1:** corrige los errores `400 Bad Request` / `missing response for request` de los grupos 1/1: ya no se consulta la cadena por cada Token ID del JSON (eran ~108 `ownerOf` por sincronización). Ahora los IDs vienen de la lectura normal de la wallet y se comparan en local; además todas las lecturas RPC **reintentan con espera creciente** (0,5 s · 1 s · 2 s) y la concurrencia bajó a 3 (`NFT_RPC_CONCURRENCY`).
 
 ## Novedades de la v7.2: roles por Token ID (1/1) con JSON externo
 
@@ -15,7 +49,7 @@ Da roles a quien tenga **tokens concretos** (por ID), con la lista y el `role_id
 
 - **`coleccion` (nuevo campo, obligatorio):** nombre o contrato de una colección ya registrada con `/nft-registrar coleccion`. Hace falta porque los mismos IDs existen en colecciones distintas (en tu lista, el 996 y el 999 están en Piggies y en Baby Piggies). Si solo hay una colección activa, puede omitirse.
 - **`role_id`:** mientras valga `TU_DISCORD_ROLE_ID_AQUI` (o no sea un ID válido) ese grupo se ignora y `/nft-registrar token-roles` te lo avisa. Cambiarlo es editar el JSON y reiniciar.
-- **Cómo verifica:** para cada grupo lee el dueño actual de cada token (`ownerOf`) y da el rol si **alguna de las wallets vinculadas** del usuario es dueña de **alguno** de los IDs. No necesita ERC721Enumerable. Cada token se lee una sola vez por sincronización (caché de 10 min), no una vez por usuario.
+- **Cómo verifica (v7.3): índice interno, CERO llamadas a la blockchain.** Los roles por Token ID leen **solo MongoDB** (colección `TokenOwner`: token → wallet dueña) y comparan en local con las listas `token_ids` y con las wallets vinculadas del usuario. No hay `ownerOf`, ni `balanceOf`, ni metadatos para estos grupos. Si un grupo aún no tiene datos en el índice, su rol **no se quita** (y `/nft-registrar token-roles` lo muestra).
 - **Se suma, no reemplaza:** convive con el rol de Holder, los roles por rasgo y por categoría. Un rol se quita solo cuando ya no corresponde **y** la lectura no falló (si el RPC se cae, nadie pierde roles). Un token quemado o inexistente se trata como «sin dueño».
 - **Cuándo se aplica:** en la sincronización automática de 24 h, al vincular una wallet, y al instante con `/nft-registrar sincronizar`.
 - **`/nft-registrar token-roles`** muestra cada grupo con su colección, nº de tokens y rol (✅ listo, ⚠️ falta colección o rol, ❌ el rol del bot está por debajo del rol a asignar).

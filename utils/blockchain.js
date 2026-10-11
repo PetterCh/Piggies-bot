@@ -13,9 +13,8 @@ const ERC721_ABI = [
 const DEAD = '0x000000000000000000000000000000000000dEaD';
 const providers = new Map(); // url -> provider
 const metadataCache = new Map(); // clave -> { attrs, expires }
-const ownerCache = new Map(); // red:contrato:tokenId -> { owner, expires }
-const ownerInflight = new Map(); // misma clave -> promesa en curso (evita lecturas duplicadas simultáneas)
-const OWNER_TTL_MS = 10 * 60 * 1000;
+const holdingsCache = new Map(); // red:contrato:wallet -> { value, expires } (evita releer la misma wallet en pocos minutos)
+const HOLDINGS_TTL_MS = 3 * 60 * 1000;
 const METADATA_TTL_MS = 6 * 60 * 60 * 1000;
 
 /** Normaliza texto para comparar rasgos sin distinguir mayúsculas/espacios. */
@@ -95,7 +94,7 @@ async function getTokenAttributes(col, contract, tokenId) {
   const hit = metadataCache.get(key);
   if (hit && hit.expires > Date.now()) return hit.attrs;
 
-  let uri = await contract.tokenURI(tokenId);
+  let uri = await rpc(() => contract.tokenURI(tokenId));
   uri = uri.replace('{id}', BigInt(tokenId).toString(16).padStart(64, '0'));
   const attrs = normalizeAttributes(await fetchJson(uri));
 
@@ -105,61 +104,67 @@ async function getTokenAttributes(col, contract, tokenId) {
 }
 
 /**
- * Lee lo que una wallet posee de una colección.
- * - Sin reglas por rasgos: solo balanceOf (1 llamada, funciona con cualquier ERC-721).
- * - Con reglas por rasgos: necesita ERC721Enumerable para listar los tokenIds + sus metadatos.
- * Cualquier fallo lanza error: el llamador NO debe quitar roles cuando hay error.
- * Devuelve { count, tokens: [{ id, attrs }] }
+ * Ejecuta una lectura RPC con reintentos y espera creciente ante fallos TEMPORALES del proveedor
+ * (400/429/5xx, "missing response", timeouts, red). Un revert del contrato (CALL_EXCEPTION) NO se reintenta.
  */
-async function getHoldings(col, wallet, needTraits) {
-  const contract = getContract(col);
-  const count = Number(await contract.balanceOf(wallet));
-  if (!needTraits || count === 0) return { count, tokens: [] };
-
-  const n = Math.min(count, config.nft.maxTokensPerWallet);
-  let ids;
-  try {
-    ids = await mapLimit([...Array(n).keys()], config.nft.concurrency, (i) => contract.tokenOfOwnerByIndex(wallet, i));
-  } catch (err) {
-    throw new Error(`La colección no soporta ERC721Enumerable (necesario para roles por rasgos): ${err.shortMessage || err.message}`);
+async function rpc(fn, attempts = 4) {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (err.code === 'CALL_EXCEPTION' || i >= attempts - 1) throw err;
+      await new Promise((r) => setTimeout(r, 500 * 2 ** i + Math.random() * 250)); // 0,5 s · 1 s · 2 s (+ jitter)
+    }
   }
-  const tokens = await mapLimit(ids, config.nft.concurrency, async (id) => ({
-    id: id.toString(),
-    attrs: await getTokenAttributes(col, contract, id),
-  }));
-  return { count, tokens };
 }
 
 /**
- * Dueño actual de cada tokenId (ownerOf), en minúsculas. Devuelve Map<tokenId(string), direccion|null>.
- * - Token inexistente o quemado (el contrato revierte) -> null: no es un fallo, simplemente nadie lo tiene.
- * - Fallo de RPC/red -> LANZA el error (el llamador NO debe quitar roles por un fallo temporal).
- * Cachea 10 min por token, así una sincronización con cientos de usuarios lee cada token una sola vez.
+ * Lee lo que una wallet posee de una colección (UNA lectura por wallet y colección, compartida por todas las reglas).
+ *  - balanceOf siempre (1 llamada, funciona con cualquier ERC-721).
+ *  - ids (needIds): lista los tokenIds de la wallet con tokenOfOwnerByIndex (ERC721Enumerable). SIN metadatos.
+ *  - attrs (needAttrs): además descarga el metadato de cada token (solo para reglas por rasgo/categoría).
+ * Cualquier fallo lanza error: el llamador NO debe quitar roles cuando hay error.
+ * Devuelve { count, ids: string[], truncated, tokens: [{ id, attrs }] }  (tokens solo con needAttrs).
  */
-async function getTokenOwners(col, tokenIds) {
+async function getHoldings(col, wallet, { needIds = false, needAttrs = false } = {}) {
+  const key = `${col.network}:${col.contractAddress}:${String(wallet).toLowerCase()}:${needIds || needAttrs ? (needAttrs ? 'a' : 'i') : 'c'}`;
+  const hit = holdingsCache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.value;
+
   const contract = getContract(col);
-  const owners = new Map();
-  await mapLimit([...new Set(tokenIds.map(String))], config.nft.concurrency, async (id) => {
-    const key = `${col.network}:${col.contractAddress}:${id}`;
-    const hit = ownerCache.get(key);
-    if (hit && hit.expires > Date.now()) return void owners.set(id, hit.owner);
-    if (!ownerInflight.has(key)) {
-      ownerInflight.set(key, (async () => {
-        try {
-          const owner = String(await contract.ownerOf(BigInt(id))).toLowerCase();
-          return owner;
-        } catch (err) {
-          if (err.code === 'CALL_EXCEPTION') return null; // revert: el token no existe / está quemado
-          throw err;
-        }
-      })().finally(() => ownerInflight.delete(key)));
+  const count = Number(await rpc(() => contract.balanceOf(wallet)));
+  let value = { count, ids: [], truncated: false, tokens: [] };
+
+  if ((needIds || needAttrs) && count > 0) {
+    const cap = needAttrs ? config.nft.maxTokensPerWallet : config.nft.maxIdsPerWallet;
+    const n = Math.min(count, cap);
+    let ids;
+    try {
+      ids = await mapLimit([...Array(n).keys()], config.nft.concurrency, (i) => rpc(() => contract.tokenOfOwnerByIndex(wallet, i)));
+    } catch (err) {
+      throw new Error(`La colección ${col.name} no soporta ERC721Enumerable (necesario para listar los tokenIds de una wallet): ${err.shortMessage || err.message}`);
     }
-    const owner = await ownerInflight.get(key);
-    if (ownerCache.size > 50_000) ownerCache.clear();
-    ownerCache.set(key, { owner, expires: Date.now() + OWNER_TTL_MS });
-    owners.set(id, owner);
-  });
-  return owners;
+    value = { count, ids: ids.map(String), truncated: count > n, tokens: [] };
+    if (needAttrs) {
+      value.tokens = await mapLimit(ids, config.nft.concurrency, async (id) => ({ id: id.toString(), attrs: await getTokenAttributes(col, contract, id) }));
+    }
+  }
+  if (holdingsCache.size > 20_000) holdingsCache.clear();
+  holdingsCache.set(key, { value, expires: Date.now() + HOLDINGS_TTL_MS });
+  return value;
 }
 
-module.exports = { getTokenOwners, norm, ANY_VALUE, hasEmptyValue, normalizeAddress, verifyContract, getHoldings };
+/**
+ * Dueño de UN token (minúsculas) con reintentos. null = el contrato revierte (token inexistente o quemado).
+ * Solo lo usa el refresco lento y manual del índice interno (services/tokenOwners.js), nunca la verificación de roles.
+ */
+async function ownerOfToken(col, tokenId) {
+  try {
+    return String(await rpc(() => getContract(col).ownerOf(BigInt(tokenId)))).toLowerCase();
+  } catch (err) {
+    if (err.code === 'CALL_EXCEPTION') return null;
+    throw err;
+  }
+}
+
+module.exports = { ownerOfToken, norm, ANY_VALUE, hasEmptyValue, normalizeAddress, verifyContract, getHoldings };
