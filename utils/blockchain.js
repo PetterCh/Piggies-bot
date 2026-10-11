@@ -7,11 +7,15 @@ const ERC721_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
   'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)', // ERC721Enumerable
   'function tokenURI(uint256 tokenId) view returns (string)',
+  'function ownerOf(uint256 tokenId) view returns (address)',
 ];
 
 const DEAD = '0x000000000000000000000000000000000000dEaD';
 const providers = new Map(); // url -> provider
 const metadataCache = new Map(); // clave -> { attrs, expires }
+const ownerCache = new Map(); // red:contrato:tokenId -> { owner, expires }
+const ownerInflight = new Map(); // misma clave -> promesa en curso (evita lecturas duplicadas simultáneas)
+const OWNER_TTL_MS = 10 * 60 * 1000;
 const METADATA_TTL_MS = 6 * 60 * 60 * 1000;
 
 /** Normaliza texto para comparar rasgos sin distinguir mayúsculas/espacios. */
@@ -126,4 +130,36 @@ async function getHoldings(col, wallet, needTraits) {
   return { count, tokens };
 }
 
-module.exports = { norm, ANY_VALUE, hasEmptyValue, normalizeAddress, verifyContract, getHoldings };
+/**
+ * Dueño actual de cada tokenId (ownerOf), en minúsculas. Devuelve Map<tokenId(string), direccion|null>.
+ * - Token inexistente o quemado (el contrato revierte) -> null: no es un fallo, simplemente nadie lo tiene.
+ * - Fallo de RPC/red -> LANZA el error (el llamador NO debe quitar roles por un fallo temporal).
+ * Cachea 10 min por token, así una sincronización con cientos de usuarios lee cada token una sola vez.
+ */
+async function getTokenOwners(col, tokenIds) {
+  const contract = getContract(col);
+  const owners = new Map();
+  await mapLimit([...new Set(tokenIds.map(String))], config.nft.concurrency, async (id) => {
+    const key = `${col.network}:${col.contractAddress}:${id}`;
+    const hit = ownerCache.get(key);
+    if (hit && hit.expires > Date.now()) return void owners.set(id, hit.owner);
+    if (!ownerInflight.has(key)) {
+      ownerInflight.set(key, (async () => {
+        try {
+          const owner = String(await contract.ownerOf(BigInt(id))).toLowerCase();
+          return owner;
+        } catch (err) {
+          if (err.code === 'CALL_EXCEPTION') return null; // revert: el token no existe / está quemado
+          throw err;
+        }
+      })().finally(() => ownerInflight.delete(key)));
+    }
+    const owner = await ownerInflight.get(key);
+    if (ownerCache.size > 50_000) ownerCache.clear();
+    ownerCache.set(key, { owner, expires: Date.now() + OWNER_TTL_MS });
+    owners.set(id, owner);
+  });
+  return owners;
+}
+
+module.exports = { getTokenOwners, norm, ANY_VALUE, hasEmptyValue, normalizeAddress, verifyContract, getHoldings };

@@ -1,4 +1,31 @@
-# 🪙 Coinks Bot v7.1
+# 🪙 Coinks Bot v7.2
+
+## Novedades de la v7.2: roles por Token ID (1/1) con JSON externo
+
+Da roles a quien tenga **tokens concretos** (por ID), con la lista y el `role_id` en un JSON que puedes cambiar sin tocar el código.
+
+**Dónde vive el JSON** (el primero que exista): la variable de entorno `TOKEN_ROLES_JSON` (cómoda en Railway: editas la variable y reinicias) o el archivo `data/token-roles.json` (`TOKEN_ROLES_FILE` cambia la ruta; se relee solo si el archivo cambia).
+
+```json
+{ "roles": [
+  { "nombre_referencia": "Piggies OG 1/1", "descripcion": "…", "coleccion": "Piggies",
+    "role_id": "123456789012345678", "token_ids": [3, 853, 996] }
+] }
+```
+
+- **`coleccion` (nuevo campo, obligatorio):** nombre o contrato de una colección ya registrada con `/nft-registrar coleccion`. Hace falta porque los mismos IDs existen en colecciones distintas (en tu lista, el 996 y el 999 están en Piggies y en Baby Piggies). Si solo hay una colección activa, puede omitirse.
+- **`role_id`:** mientras valga `TU_DISCORD_ROLE_ID_AQUI` (o no sea un ID válido) ese grupo se ignora y `/nft-registrar token-roles` te lo avisa. Cambiarlo es editar el JSON y reiniciar.
+- **Cómo verifica:** para cada grupo lee el dueño actual de cada token (`ownerOf`) y da el rol si **alguna de las wallets vinculadas** del usuario es dueña de **alguno** de los IDs. No necesita ERC721Enumerable. Cada token se lee una sola vez por sincronización (caché de 10 min), no una vez por usuario.
+- **Se suma, no reemplaza:** convive con el rol de Holder, los roles por rasgo y por categoría. Un rol se quita solo cuando ya no corresponde **y** la lectura no falló (si el RPC se cae, nadie pierde roles). Un token quemado o inexistente se trata como «sin dueño».
+- **Cuándo se aplica:** en la sincronización automática de 24 h, al vincular una wallet, y al instante con `/nft-registrar sincronizar`.
+- **`/nft-registrar token-roles`** muestra cada grupo con su colección, nº de tokens y rol (✅ listo, ⚠️ falta colección o rol, ❌ el rol del bot está por debajo del rol a asignar).
+- Los ids repetidos dentro de un grupo se ignoran; los roles deben estar **por debajo** del rol del bot.
+
+**Pasos:** 1) registra las colecciones si no lo hiciste (`/nft-registrar coleccion`); 2) crea los 3 roles y copia sus IDs (modo desarrollador de Discord → clic derecho → Copiar ID); 3) edita `data/token-roles.json` (o `TOKEN_ROLES_JSON`) con el `role_id` y el nombre de la colección de cada grupo; 4) reinicia, revisa `/nft-registrar token-roles` y ejecuta `/nft-registrar sincronizar`. Por esto no hace falta `npm run deploy` salvo que sea tu primera vez con la v7.2 (hay un subcomando nuevo).
+
+---
+
+# Novedades de la v7.1
 
 ## Novedades de la v7.1
 

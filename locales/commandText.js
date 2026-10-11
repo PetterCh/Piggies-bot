@@ -196,6 +196,7 @@ const descriptions = {
   'Muestra las colecciones registradas': 'Show the registered collections',
   'Elimina una colección (los roles ya otorgados NO se quitan)': 'Delete a collection (roles already granted are NOT removed)',
   'Nombre o contrato': 'Name or contract',
+  'Muestra los roles por Token ID (JSON externo) y si están bien configurados': 'Show the Token ID roles (external JSON) and whether they are set up correctly',
   'Fuerza ahora la sincronización de roles de este servidor': "Force a role sync for this server now",
   '(Admin) Publica el panel de verificación de wallets en este canal': '(Admin) Post the wallet verification panel in this channel',
   '(Admin) Desvincula wallets de un usuario (error de tipeo o suplantación)': '(Admin) Unlink a user\'s wallets (typo or impersonation)',

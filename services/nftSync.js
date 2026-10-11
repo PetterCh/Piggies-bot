@@ -5,6 +5,7 @@ const WalletLink = require('../models/WalletLink');
 const config = require('../config');
 const { getHoldings, norm, ANY_VALUE, hasEmptyValue } = require('../utils/blockchain');
 const { mapLimit } = require('../utils/helpers');
+const tokenRoles = require('./tokenRoles');
 
 const getGuildCollections = (guildId) => NftCollection.find({ guildId, active: true });
 
@@ -14,6 +15,7 @@ function getManagedRoleIds(collections) {
     if (c.holderRoleId) ids.add(c.holderRoleId);
     for (const t of c.traitRoles) ids.add(t.roleId);
   }
+  for (const id of tokenRoles.managedRoleIds(collections)) ids.add(id); // roles por token ID (JSON externo)
   return ids;
 }
 
@@ -53,6 +55,10 @@ async function evaluateWallets(collections, addresses) {
       }
     }
   }
+  // Roles por token ID concreto (JSON externo): se SUMAN a los de holder y rasgo, nunca los reemplazan.
+  const byToken = await tokenRoles.evaluateTokenRoles(collections, addresses);
+  byToken.desired.forEach((r) => desired.add(r));
+  byToken.failed.forEach((r) => failed.add(r));
   return { desired, failed };
 }
 

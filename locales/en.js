@@ -65,6 +65,15 @@ module.exports = {
     syncing: "🔄 Syncing… this may take a while depending on the number of wallets.",
     synced: "✅ Done: {checked} users checked, +{added} / -{removed} roles, {errors} errors.",
     notFound: "I couldn't find that collection (use its name or contract). See /nft-registrar listar.",
+    tokenRoles: {
+      title: "🎯 Token ID roles",
+      none: "No valid groups. Edit `data/token-roles.json` (or the `TOKEN_ROLES_JSON` variable) and restart.",
+      count: "{n} tokens",
+      noRole: "(that role doesn't exist in this server)",
+      hierarchy: "the bot's role is below it",
+      problems: "Warnings",
+      footer: "✅ ready · ⚠️ collection/role missing · ❌ the bot can't assign that role",
+    },
   },
   wallet: {
     panel: {

@@ -1,7 +1,8 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
 const NftCollection = require('../../models/NftCollection');
 const { normalizeAddress, verifyContract, ANY_VALUE } = require('../../utils/blockchain');
-const { syncGuild } = require('../../services/nftSync');
+const { syncGuild, getGuildCollections } = require('../../services/nftSync');
+const tokenRoles = require('../../services/tokenRoles');
 const { UserError, escapeRegex } = require('../../utils/helpers');
 
 function assertRoleUsable(t, guild, role) {
@@ -43,6 +44,7 @@ module.exports = {
     .addSubcommand((s) => s.setName('listar').setDescription('Muestra las colecciones registradas'))
     .addSubcommand((s) => s.setName('eliminar').setDescription('Elimina una colección (los roles ya otorgados NO se quitan)')
       .addStringOption((o) => o.setName('coleccion').setDescription('Nombre o contrato').setRequired(true)))
+    .addSubcommand((s) => s.setName('token-roles').setDescription('Muestra los roles por Token ID (JSON externo) y si están bien configurados'))
     .addSubcommand((s) => s.setName('sincronizar').setDescription('Fuerza ahora la sincronización de roles de este servidor')),
 
   async execute(interaction) {
@@ -101,6 +103,22 @@ module.exports = {
           const col = await findCollection(t, guild.id, interaction.options.getString('coleccion', true));
           await col.deleteOne();
           return interaction.editReply(t('nft.deleted', { name: col.name }));
+        }
+        case 'token-roles': {
+          const cols = await getGuildCollections(guild.id);
+          const { groups } = tokenRoles.loadGroups();
+          const { resolved, problems } = tokenRoles.resolveGroups(cols);
+          const ok = new Set(resolved.map((g) => g.ref));
+          const lines = groups.map((g) => {
+            const role = guild.roles.cache.get(g.roleId);
+            const state = !ok.has(g.ref) ? '⚠️' : role?.editable ? '✅' : '❌';
+            return `${state} **${g.ref}** · ${g.collection || '—'} · ${t('nft.tokenRoles.count', { n: g.tokenIds.length })} → ${role ? `<@&${role.id}>` : `\`${g.roleId}\` ${t('nft.tokenRoles.noRole')}`}${role && !role.editable ? ` (${t('nft.tokenRoles.hierarchy')})` : ''}`;
+          });
+          const embed = new EmbedBuilder().setTitle(t('nft.tokenRoles.title')).setColor(0x5865f2)
+            .setDescription((lines.join('\n') || t('nft.tokenRoles.none')).slice(0, 3900));
+          if (problems.length) embed.addFields({ name: t('nft.tokenRoles.problems'), value: problems.map((x) => `• ${x}`).join('\n').slice(0, 1000) });
+          embed.setFooter({ text: t('nft.tokenRoles.footer') });
+          return interaction.editReply({ embeds: [embed] });
         }
         case 'sincronizar': {
           await interaction.editReply(t('nft.syncing'));
