@@ -11,7 +11,7 @@ const prizeLabel = (g, L) =>
   [g.prizeText, g.prizeCoinks ? `${fmt(g.prizeCoinks)} ${config.currency.emoji} ${config.currency.name}` : null].filter(Boolean).join(' + ');
 
 function buildEmbed(g, { ended = false, cancelled = false } = {}) {
-  const L = g.lang || 'es';
+  const L = g.lang || config.defaultLang;
   const ts = Math.floor(g.endsAt.getTime() / 1000);
   const cost = g.entryCost > 0 ? t(L, 'giveaway.cost', { price: fmt(g.entryCost), emoji: config.currency.emoji, currency: config.currency.name }) : t(L, 'giveaway.free');
   const e = new EmbedBuilder()
@@ -36,7 +36,7 @@ const buildRow = (g, disabled = false) =>
       .setCustomId(`gw:join:${g._id}`)
       .setStyle(ButtonStyle.Primary)
       .setEmoji('🎉')
-      .setLabel(t(g.lang || 'es', 'giveaway.btnJoin'))
+      .setLabel(t(g.lang || config.defaultLang, 'giveaway.btnJoin'))
       .setDisabled(disabled)
   );
 
@@ -53,7 +53,7 @@ async function updateMessage(client, g, opts, disabled) {
 
 /** Paga (una sola vez por ganador) y anuncia. Reentrante: sirve también para reanudar tras un reinicio. */
 async function finalize(client, g) {
-  const L = g.lang || 'es';
+  const L = g.lang || config.defaultLang;
   for (const w of g.winners) {
     if (!g.prizeCoinks) break;
     // "Marcar y luego pagar": cada ganador cobra como máximo una vez aunque el bot se caiga a mitad.

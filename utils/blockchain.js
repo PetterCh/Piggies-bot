@@ -17,6 +17,12 @@ const METADATA_TTL_MS = 6 * 60 * 60 * 1000;
 /** Normaliza texto para comparar rasgos sin distinguir mayúsculas/espacios. */
 const norm = (s) => String(s).trim().toLowerCase();
 
+/** Valor reservado de una regla de rasgo: "cualquier valor de esta categoría" (/nft-registrar rasgo sin `valor`). */
+const ANY_VALUE = '*';
+/** Valores que significan "no tiene el rasgo" aunque el atributo exista en los metadatos. */
+const EMPTY_VALUES = new Set(['', 'none', 'null', 'n/a', 'na', 'no', 'ninguno', 'ninguna', 'nada', '-', 'undefined']);
+const hasEmptyValue = (normalizedValue) => EMPTY_VALUES.has(normalizedValue);
+
 /**
  * Devuelve la dirección en formato 0x minúsculas, o null si no es válida.
  * Acepta el prefijo "ronin:" (se convierte a 0x).
@@ -120,4 +126,4 @@ async function getHoldings(col, wallet, needTraits) {
   return { count, tokens };
 }
 
-module.exports = { norm, normalizeAddress, verifyContract, getHoldings };
+module.exports = { norm, ANY_VALUE, hasEmptyValue, normalizeAddress, verifyContract, getHoldings };

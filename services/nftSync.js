@@ -3,7 +3,7 @@
 const NftCollection = require('../models/NftCollection');
 const WalletLink = require('../models/WalletLink');
 const config = require('../config');
-const { getHoldings, norm } = require('../utils/blockchain');
+const { getHoldings, norm, ANY_VALUE, hasEmptyValue } = require('../utils/blockchain');
 const { mapLimit } = require('../utils/helpers');
 
 const getGuildCollections = (guildId) => NftCollection.find({ guildId, active: true });
@@ -15,6 +15,18 @@ function getManagedRoleIds(collections) {
     for (const t of c.traitRoles) ids.add(t.roleId);
   }
   return ids;
+}
+
+/**
+ * ¿Este NFT cumple la regla? Dos formas:
+ *  - rasgo exacto (value = "Gold"): el NFT tiene traitType = Gold.
+ *  - CATEGORÍA (value = ANY_VALUE): el NFT tiene ese traitType con cualquier valor real (se ignoran "none", "n/a"…).
+ */
+function matchesRule(rule, attrs) {
+  const v = attrs[norm(rule.traitType)];
+  if (v === undefined) return false;
+  if (rule.value === ANY_VALUE) return !hasEmptyValue(v);
+  return v === norm(rule.value);
 }
 
 /**
@@ -32,7 +44,7 @@ async function evaluateWallets(collections, addresses) {
         const { count, tokens } = await getHoldings(col, address, needTraits);
         if (count > 0 && col.holderRoleId) desired.add(col.holderRoleId);
         for (const rule of col.traitRoles) {
-          if (tokens.some((t) => t.attrs[norm(rule.traitType)] === norm(rule.value))) desired.add(rule.roleId);
+          if (tokens.some((t) => matchesRule(rule, t.attrs))) desired.add(rule.roleId);
         }
       } catch (err) {
         console.error(`[nft] Falló ${col.name} para ${address}: ${err.shortMessage || err.message}`);
@@ -111,4 +123,4 @@ async function syncAllGuilds(client) {
   }
 }
 
-module.exports = { getGuildCollections, syncMember, syncGuild, syncAllGuilds, walletsOf };
+module.exports = { matchesRule, evaluateWallets, getGuildCollections, syncMember, syncGuild, syncAllGuilds, walletsOf };

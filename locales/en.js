@@ -56,6 +56,8 @@ module.exports = {
     registered: "✅ Collection **{name}** registered (`{address}`, {network}).{holder}\nUse `/nft-registrar rasgo` to add trait-based roles.",
     holderLine: " Holders → {role}.",
     traitSaved: "✅ **{name}**: {trait} = {value} → {role}.\nℹ️ Trait roles require the contract to be ERC721Enumerable.",
+    categorySaved: "✅ **{name}**: any NFT with the **{trait}** trait/category (any value) → {role}.\nℹ️ This does not change the collection's Holder role. Trait roles require the contract to be ERC721Enumerable.",
+    anyValue: "{trait} = (any value)",
     empty: "No collections registered.",
     listTitle: "🖼️ NFT collections",
     holderLabel: "Holder",
@@ -240,6 +242,9 @@ module.exports = {
     },
   },
   inv: {
+    equipPlaceholder: "Equip from backpack…",
+    unequipPlaceholder: "Unequip…",
+    unequipAll: "Unequip everything",
     btnSell: "Sell",
     perks: "✨ Perks: +{loot}% Coinks · {revive}% chance to survive death",
     btnFuse: "Fuse",
@@ -250,6 +255,11 @@ module.exports = {
     bag: "Backpack",
     stats: "Stats",
     statsLine: "Expeditions: {exp} · Survived: {ok} · Deaths: {dead} · Total loot: 🪙 {loot}",
+  },
+  unequip: {
+    nothing: "ℹ️ You have nothing equipped in that slot.",
+    done: "✅ You unequipped {items}. It went back to your backpack with its remaining uses.",
+    unknown: "❌ Unknown slot.",
   },
   equip: {
     unknown: "❌ Unknown item.",

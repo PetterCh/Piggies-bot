@@ -1,3 +1,43 @@
+# 🪙 Coinks Bot v7.1
+
+## Novedades de la v7.1
+
+| # | Cambio | Dónde |
+|---|--------|-------|
+| 1 | **Desequipar**: `/inventario desequipar [ranura]` y, en `/inventario ver`, menús para **equipar** y **desequipar** sin escribir nada. El objeto vuelve a la mochila **con sus usos restantes** | `commands/games/inventario.js`, `services/inventory.js` (`equipItem`, `unequip`) |
+| 2 | **Inglés por defecto** (comandos, descripciones, mensajes y embeds) conservando el español para quien lo use | `config.js`, `utils/i18n.js`, `locales/commandText.js`, `utils/commandLocalization.js`, `deploy-commands.js` |
+| 3 | **Roles por categoría de rasgos**: `/nft-registrar rasgo` sin `valor` da el rol a cualquier NFT que tenga ese tipo de rasgo | `commands/nft/nft-registrar.js`, `services/nftSync.js`, `utils/blockchain.js` |
+
+### 1. Equipar y desequipar
+- `/inventario ver` muestra la mochila con tres controles: botones *Vender*/*Fusionar*, menú **Equipar desde la mochila…** (lo mejor primero, hasta 25 modelos) y menú **Quitar equipo…** (solo las ranuras ocupadas, más *Quitar todo*). Al elegir, el mismo mensaje se redibuja.
+- `/inventario desequipar [ranura: arma|armadura|casco|todo]` (sin ranura = todo).
+- Quitar es **una sola operación atómica por ranura** (sale de la ranura y entra a la mochila a la vez): nunca se pierde ni se duplica un objeto. Mientras el cerdito está de expedición el equipo está **bloqueado** (igual que antes; si te olvidaste algo, `/expedicion cancelar`).
+- Nota: en la v7 `equipar` vive en `/inventario` (ya no en `/expedicion`).
+
+### 2. Idioma
+- Prioridad: `/idioma` del usuario → idioma del cliente de Discord → idioma preferido del servidor → **`DEFAULT_LANG` (ahora `en`)**. Quien tenga Discord en español, o elija `/idioma español`, sigue viendo todo en español. Si falta una clave en un idioma, se usa el inglés.
+- **Railway / `.env`:** si ya tenías la variable `DEFAULT_LANG=es`, cámbiala a `en` (o bórrala); si no, seguirá en español.
+- **Comandos en Discord:** al hacer `npm run deploy`, la descripción base de cada comando es la inglesa y los usuarios con Discord en español ven la original; los **nombres** se ven en inglés con Discord en inglés (`/inventory`, `/expedition`, `/shop-admin`, `/nft-register`…). Internamente los nombres base no cambian (Discord siempre los envía igual), así que nada se rompe. Los usuarios con otros idiomas ven los nombres base (en español) con descripción en inglés.
+- Los textos de los comandos están en `locales/commandText.js`. Al crear un comando nuevo, añade ahí su descripción en inglés; `npm run check:commands` (y el propio `deploy`) avisan de lo que falte.
+- Los mensajes fijos del bot que mencionan comandos (p. ej. «usa `/expedicion cancelar`») usan el nombre base.
+
+### 3. Roles por categoría de rasgos
+`/nft-registrar rasgo coleccion:<nombre> tipo:<categoría> rol:@rol [valor:<valor>]`
+- **Con `valor`** (p. ej. `tipo:Background valor:Gold`): regla exacta, como antes.
+- **Sin `valor`** (p. ej. `tipo:Special rol:@Piggy 1/1`): **categoría**: cualquier NFT que tenga un rasgo `Special`, con el valor que sea, da el rol. Se ignoran los valores vacíos tipo `none`, `n/a`, `no`, `ninguno`, `-`.
+- Si tus metadatos son `Category = special`, usa `tipo:Category valor:special` (regla exacta).
+- **No toca el rol de Holder** ni la verificación de balance: los roles de rasgo se suman a los de holder (se calcula la unión de todas las colecciones y wallets vinculadas) y, como siempre, un rol se quita solo si ya no corresponde y la lectura de esa colección no falló. Repetir el comando con el mismo `tipo` y `valor` solo cambia el rol. `/nft-registrar listar` muestra las categorías como `Special = (cualquier valor)`. Requiere contratos ERC721Enumerable (como los roles por rasgo).
+- Tras configurarlo ejecuta `/nft-registrar sincronizar` (si no, se aplica en la sincronización de 24 h).
+
+### Actualizar desde la v7
+1. Copia **todo** el código reemplazando (conserva `.env`). No hacen falta paquetes nuevos.
+2. En Railway, pon `DEFAULT_LANG=en` (o bórrala).
+3. **`npm run deploy`** (registra los nombres/descripciones localizados y el nuevo `/inventario desequipar`) y reinicia.
+
+---
+
+> Lo que sigue es la documentación de la v7, que sigue vigente.
+
 # 🪙 Coinks Bot v7
 
 **v7 = tu versión estable v4 + únicamente los 7 cambios pedidos.** Sin `canvas`, sin paperdoll y sin `interactions/`: todo el equipo se muestra con emojis y texto. Los botones persistentes viven **dentro del archivo del comando** que los crea, y si alguna vez hay un componente duplicado el bot te dice exactamente qué dos archivos lo declaran.
@@ -66,6 +106,7 @@ Zonas: `bosque`, `cueva`, `volcan`, `ruinas`, `abismo`, `trono`. Rarezas: `commo
 |---|---|
 | `ver` | Equipo, perks, mochila (los exclusivos con sus usos), estadísticas y botones **Vender** / **Fusionar** |
 | `equipar` | Equipa un objeto (bloqueado mientras el cerdito está de expedición) |
+| `desequipar [ranura]` | Devuelve el equipo a la mochila con sus usos restantes (v7.1) |
 | `vender objeto cantidad|todos` | Venta con confirmación; los exclusivos no se venden |
 | `fusionar` | Categoría → objetos → confirmación (tarifa y % de éxito visibles) |
 | `recetas` | Precios de venta y recetas de fusión |

@@ -1,5 +1,6 @@
 // Lógica del minijuego "Expediciones de Cerditos": salida, resolución, cancelación y resultado.
 const { EmbedBuilder } = require('discord.js');
+const config = require('../config');
 const User = require('../models/User');
 const Expedition = require('../models/Expedition');
 const { getUser, logLedger, removeCoinks, addCoinks, InsufficientFundsError } = require('../utils/economy');
@@ -158,7 +159,7 @@ async function cancelExpedition(discordId, guildId, { dryRun = false } = {}) {
 
 // ---------------- RESULTADO ----------------
 function buildResultEmbed(exp, outcome) {
-  const L = exp.lang || 'es';
+  const L = exp.lang || config.defaultLang;
   const zone = ZONES[exp.zoneId];
   const embed = new EmbedBuilder().setTitle(t(L, 'expedition.return.title', { emoji: zone.emoji, zone: t(L, `zone.${zone.id}.name`) }));
   const event = exp.eventId ? EVENTS[exp.eventId] : null;

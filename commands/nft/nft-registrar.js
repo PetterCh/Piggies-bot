@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
 const NftCollection = require('../../models/NftCollection');
-const { normalizeAddress, verifyContract } = require('../../utils/blockchain');
+const { normalizeAddress, verifyContract, ANY_VALUE } = require('../../utils/blockchain');
 const { syncGuild } = require('../../services/nftSync');
 const { UserError, escapeRegex } = require('../../utils/helpers');
 
@@ -34,11 +34,11 @@ module.exports = {
         .addStringOption((o) => o.setName('rpc').setDescription('RPC propio (si no, se usa el de la red en .env)'))
     )
     .addSubcommand((s) =>
-      s.setName('rasgo').setDescription('Añade un rol por rasgo (trait) de los metadatos')
+      s.setName('rasgo').setDescription('Rol por rasgo (trait) o por CATEGORÍA completa de rasgos')
         .addStringOption((o) => o.setName('coleccion').setDescription('Nombre o contrato de la colección').setRequired(true))
-        .addStringOption((o) => o.setName('tipo').setDescription('Tipo de rasgo, ej: Background').setRequired(true))
-        .addStringOption((o) => o.setName('valor').setDescription('Valor del rasgo, ej: Gold').setRequired(true))
+        .addStringOption((o) => o.setName('tipo').setDescription('Tipo/categoría del rasgo, ej: Background o Special').setRequired(true))
         .addRoleOption((o) => o.setName('rol').setDescription('Rol que se otorga').setRequired(true))
+        .addStringOption((o) => o.setName('valor').setDescription('Valor exacto, ej: Gold (vacío = CUALQUIER valor de esa categoría)'))
     )
     .addSubcommand((s) => s.setName('listar').setDescription('Muestra las colecciones registradas'))
     .addSubcommand((s) => s.setName('eliminar').setDescription('Elimina una colección (los roles ya otorgados NO se quitan)')
@@ -75,20 +75,24 @@ module.exports = {
         case 'rasgo': {
           const col = await findCollection(t, guild.id, interaction.options.getString('coleccion', true));
           const traitType = interaction.options.getString('tipo', true).trim();
-          const value = interaction.options.getString('valor', true).trim();
+          // Sin `valor` (o con "*") la regla es de CATEGORÍA: cualquier NFT con ese tipo de rasgo recibe el rol.
+          const rawValue = interaction.options.getString('valor')?.trim();
+          const isCategory = !rawValue || rawValue === ANY_VALUE;
+          const value = isCategory ? ANY_VALUE : rawValue;
           const role = interaction.options.getRole('rol', true);
           assertRoleUsable(t, guild, role);
+          // Una regla por (tipo, valor): repetir el comando con el mismo par solo cambia el rol. El rol de Holder NO se toca.
           col.traitRoles = col.traitRoles.filter((x) => !(x.traitType.toLowerCase() === traitType.toLowerCase() && x.value.toLowerCase() === value.toLowerCase()));
           col.traitRoles.push({ traitType, value, roleId: role.id });
           await col.save();
-          return interaction.editReply(t('nft.traitSaved', { name: col.name, trait: traitType, value, role: `${role}` }));
+          return interaction.editReply(t(isCategory ? 'nft.categorySaved' : 'nft.traitSaved', { name: col.name, trait: traitType, value, role: `${role}` }));
         }
         case 'listar': {
           const cols = await NftCollection.find({ guildId: guild.id }).sort({ createdAt: 1 });
           if (!cols.length) return interaction.editReply(t('nft.empty'));
           const embed = new EmbedBuilder().setTitle(t('nft.listTitle')).setColor(0x5865f2);
           for (const c of cols.slice(0, 25)) {
-            const traits = c.traitRoles.map((x) => `• ${x.traitType} = ${x.value} → <@&${x.roleId}>`).join('\n') || '—';
+            const traits = c.traitRoles.map((x) => (x.value === ANY_VALUE ? `• ${t('nft.anyValue', { trait: x.traitType })} → <@&${x.roleId}>` : `• ${x.traitType} = ${x.value} → <@&${x.roleId}>`)).join('\n') || '—';
             embed.addFields({ name: `${c.name} (${c.network})`, value: `\`${c.contractAddress}\`\n${t('nft.holderLabel')}: ${c.holderRoleId ? `<@&${c.holderRoleId}>` : '—'}\n${traits}`.slice(0, 1000) });
           }
           return interaction.editReply({ embeds: [embed] });

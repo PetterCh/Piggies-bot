@@ -18,7 +18,7 @@ module.exports = {
   logChannelId: process.env.ADMIN_LOG_CHANNEL_ID || null,
 
   // Idioma por defecto si no se puede detectar (el usuario siempre puede forzarlo con /idioma).
-  defaultLang: process.env.DEFAULT_LANG === 'en' ? 'en' : 'es',
+  defaultLang: process.env.DEFAULT_LANG === 'es' ? 'es' : 'en', // inglés salvo que pongas DEFAULT_LANG=es
 
   currency: { name: 'Coinks', emoji: '🪙' },
 

@@ -58,6 +58,8 @@ module.exports = {
     registered: "✅ Colección **{name}** registrada (`{address}`, {network}).{holder}\nUsa `/nft-registrar rasgo` para añadir roles por rasgos.",
     holderLine: " Holders → {role}.",
     traitSaved: "✅ **{name}**: {trait} = {value} → {role}.\nℹ️ Los roles por rasgo requieren que el contrato sea ERC721Enumerable.",
+    categorySaved: "✅ **{name}**: cualquier NFT con el rasgo/categoría **{trait}** (cualquier valor) → {role}.\nℹ️ No cambia el rol de Holder de la colección. Los roles por rasgo requieren que el contrato sea ERC721Enumerable.",
+    anyValue: "{trait} = (cualquier valor)",
     empty: "No hay colecciones registradas.",
     listTitle: "🖼️ Colecciones NFT",
     holderLabel: "Holder",
@@ -243,6 +245,9 @@ module.exports = {
     },
   },
   inv: {
+    equipPlaceholder: "Equipar desde la mochila…",
+    unequipPlaceholder: "Quitar equipo…",
+    unequipAll: "Quitar todo",
     btnSell: "Vender",
     perks: "✨ Perks: +{loot}% Coinks · {revive}% de sobrevivir a la muerte",
     btnFuse: "Fusionar",
@@ -253,6 +258,11 @@ module.exports = {
     bag: "Mochila",
     stats: "Estadísticas",
     statsLine: "Expediciones: {exp} · Sobrevividas: {ok} · Muertes: {dead} · Botín total: 🪙 {loot}",
+  },
+  unequip: {
+    nothing: "ℹ️ No llevas nada equipado en esa ranura.",
+    done: "✅ Desequipaste {items}. Volvió(eron) a tu mochila con sus usos.",
+    unknown: "❌ Ranura desconocida.",
   },
   equip: {
     unknown: "❌ Objeto desconocido.",

@@ -6,7 +6,7 @@ const expeditionSchema = new mongoose.Schema(
     guildId: { type: String, required: true },
     channelId: { type: String, required: true },
     zoneId: { type: String, required: true },
-    lang: { type: String, enum: ['es', 'en'], default: 'es' }, // idioma con el que se avisará al regresar
+    lang: { type: String, enum: ['es', 'en'], default: () => require('../config').defaultLang }, // idioma con el que se avisará al regresar
     startedAt: { type: Date, required: true },
     endsAt: { type: Date, required: true, index: true },
     status: { type: String, enum: ['active', 'resolving', 'completed', 'cancelled'], default: 'active', index: true },

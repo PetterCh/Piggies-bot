@@ -1,6 +1,6 @@
 // Internacionalización ES/EN.
 // Prioridad de idioma:  preferencia guardada (/idioma) > idioma del cliente de Discord del usuario
-//                       > idioma preferido del servidor > DEFAULT_LANG.
+//                       > idioma preferido del servidor > DEFAULT_LANG (por defecto: inglés).
 const config = require('../config');
 const User = require('../models/User');
 
@@ -16,12 +16,13 @@ function lookup(dict, key) {
   return o;
 }
 
-const has = (lang, key) => lookup(dicts[lang], key) !== undefined || lookup(dicts.es, key) !== undefined;
+const has = (lang, key) => lookup(dicts[lang], key) !== undefined || lookup(dicts.en, key) !== undefined || lookup(dicts.es, key) !== undefined;
 
 /** Traduce `key`. Si el valor es un array, devuelve una variante al azar. Reemplaza {variables}. */
 function t(lang, key, vars = {}) {
   let v = lookup(dicts[lang], key);
-  if (v === undefined) v = lookup(dicts.es, key); // respaldo en español
+  if (v === undefined) v = lookup(dicts.en, key); // respaldo: inglés (idioma por defecto)
+  if (v === undefined) v = lookup(dicts.es, key);
   if (v === undefined) return key;
   if (Array.isArray(v)) v = v[Math.floor(Math.random() * v.length)];
   return String(v).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));

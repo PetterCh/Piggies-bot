@@ -6,7 +6,7 @@ const giveawaySchema = new mongoose.Schema(
     channelId: { type: String, required: true },
     messageId: { type: String, default: null },
     hostId: { type: String, required: true },
-    lang: { type: String, enum: ['es', 'en'], default: 'es' },
+    lang: { type: String, enum: ['es', 'en'], default: () => require('../config').defaultLang },
     prizeText: { type: String, default: null }, // premio "físico"/manual (WL, merch...)
     prizeCoinks: { type: Number, default: 0 }, // Coinks por ganador
     entryCost: { type: Number, default: 0 }, // 0 = gratis

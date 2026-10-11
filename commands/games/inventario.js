@@ -1,9 +1,9 @@
-// /inventario: TODO lo de la mochila en un solo sitio — ver, equipar, vender, fusionar y recetas.
+// /inventario: TODO lo de la mochila en un solo sitio — ver, equipar, desequipar, vender, fusionar y recetas.
 // Los botones/menús (prefijo "inv") son persistentes y comparten la lógica de services/inventory.js con los subcomandos.
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, MessageFlags } = require('discord.js');
 const User = require('../../models/User');
 const config = require('../../config');
-const { ITEMS, RARITY_INFO, RARITIES, SELL_PRICE, FUSION, SLOTS, requiredDistinct, isNormal } = require('../../data/gameData');
+const { ITEMS, RARITY_INFO, RARITIES, SELL_PRICE, FUSION, requiredDistinct, isNormal } = require('../../data/gameData');
 const inv = require('../../services/inventory');
 const { getOpenExpedition } = require('../../services/expeditions');
 const { getUser } = require('../../utils/economy');
@@ -16,37 +16,31 @@ const cur = config.currency;
 const row = (...c) => new ActionRowBuilder().addComponents(...c);
 const cancelBtn = (t) => new ButtonBuilder().setCustomId('inv:cancel').setStyle(ButtonStyle.Secondary).setLabel(t('common.cancel'));
 
-// ======================= EQUIPAR =======================
+// ======================= EQUIPAR / DESEQUIPAR =======================
+// La lógica vive en services/inventory.js (equipItem / unequip); aquí solo se arman los mensajes.
+const equipMessage = (t, L, res) => {
+  if (!res.ok) return t(res.reason === 'locked' ? 'equip.locked' : res.reason === 'unknown' ? 'equip.unknown' : res.reason === 'missing' ? 'equip.missing' : 'equip.fail');
+  return t('equip.done', { item: itemLabel(L, res.itemId, res.usesLeft), back: res.previous ? t('equip.back', { item: itemLabel(L, res.previous) }) : '' });
+};
+const unequipMessage = (t, L, res) => {
+  if (!res.ok) return t(res.reason === 'locked' ? 'equip.locked' : res.reason === 'nothing' ? 'unequip.nothing' : 'unequip.unknown');
+  return t('unequip.done', { items: res.removed.map((id) => itemLabel(L, id)).join(', ') });
+};
+
 async function equip(interaction) {
-  const t = interaction.t;
-  const discordId = interaction.user.id;
-  const itemId = interaction.options.getString('objeto', true);
-  const item = ITEMS[itemId];
-  if (!item) return interaction.reply({ content: t('equip.unknown'), ...eph });
+  const res = await inv.equipItem(interaction.user.id, interaction.options.getString('objeto', true));
+  return interaction.reply({ content: equipMessage(interaction.t, interaction.lang, res), ...eph });
+}
 
-  // El equipo se bloquea mientras el cerdito está fuera (así los usos y el equipo del resultado son los que salieron).
-  if (await getOpenExpedition(discordId)) return interaction.reply({ content: t('equip.locked'), ...eph });
+async function unequipCommand(interaction) {
+  const res = await inv.unequip(interaction.user.id, interaction.options.getString('ranura') || 'all');
+  return interaction.reply({ content: unequipMessage(interaction.t, interaction.lang, res), ...eph });
+}
 
-  const user = await getUser(discordId);
-  const copies = user.piggy.inventory.filter((i) => i.itemId === itemId);
-  if (!copies.length) return interaction.reply({ content: t('equip.missing'), ...eph });
-  // Si hay varias copias con distintos usos restantes, se equipa la que más usos tiene.
-  const copy = copies.reduce((best, c) => ((c.usesLeft ?? Infinity) > (best.usesLeft ?? Infinity) ? c : best));
-
-  // Atómico: saca esa copia de la mochila, la equipa con sus usos y devuelve el documento ANTERIOR para recuperar lo que llevaba puesto.
-  const before = await User.findOneAndUpdate(
-    { discordId, 'piggy.inventory._id': copy._id },
-    { $pull: { 'piggy.inventory': { _id: copy._id } }, $set: { [`piggy.equipped.${item.type}`]: itemId, [`piggy.equippedUses.${item.type}`]: copy.usesLeft ?? null } },
-    { new: false }
-  );
-  if (!before) return interaction.reply({ content: t('equip.fail'), ...eph });
-  const previous = before.piggy.equipped?.[item.type];
-  if (previous) {
-    const prevUses = before.piggy.equippedUses?.[item.type] ?? ITEMS[previous]?.maxUses ?? null;
-    await User.updateOne({ discordId }, { $push: { 'piggy.inventory': { itemId: previous, usesLeft: prevUses } } });
-  }
-  const L = interaction.lang;
-  return interaction.reply({ content: t('equip.done', { item: itemLabel(L, itemId, copy.usesLeft ?? undefined), back: previous ? t('equip.back', { item: itemLabel(L, previous) }) : '' }), ...eph });
+/** Desde los menús de /inventario ver: aplica el cambio, y redibuja la pantalla en el mismo mensaje con el aviso encima. */
+async function equipFromMenu(interaction, res, message) {
+  const { flags, ...view } = await inv.renderInventory(interaction); // update() no admite flags
+  return interaction.update({ ...view, content: message });
 }
 
 // ======================= VENTA =======================
@@ -191,11 +185,14 @@ function recipes(interaction) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('inventario')
-    .setDescription('Tu mochila: ver, equipar, vender y fusionar objetos')
+    .setDescription('Tu mochila: ver, equipar, desequipar, vender y fusionar objetos')
     .setDMPermission(false)
     .addSubcommand((s) => s.setName('ver').setDescription('Mira tu mochila y tu equipo (con botones de vender y fusionar)'))
     .addSubcommand((s) => s.setName('equipar').setDescription('Equipa un arma, armadura o casco')
       .addStringOption((o) => o.setName('objeto').setDescription('Objeto a equipar').setRequired(true).setAutocomplete(true)))
+    .addSubcommand((s) => s.setName('desequipar').setDescription('Quita un objeto equipado y lo devuelve a la mochila')
+      .addStringOption((o) => o.setName('ranura').setDescription('Qué quitar (por defecto, todo)')
+        .addChoices({ name: 'Arma / Weapon', value: 'weapon' }, { name: 'Armadura / Armor', value: 'armor' }, { name: 'Casco / Helmet', value: 'helmet' }, { name: 'Todo / All', value: 'all' })))
     .addSubcommand((s) => s.setName('vender').setDescription('Vende objetos sobrantes a cambio de Coinks')
       .addStringOption((o) => o.setName('objeto').setDescription('Objeto a vender').setRequired(true).setAutocomplete(true))
       .addIntegerOption((o) => o.setName('cantidad').setDescription('Cuántos (por defecto 1)').setMinValue(1).setMaxValue(500))
@@ -231,6 +228,7 @@ module.exports = {
     switch (interaction.options.getSubcommand()) {
       case 'ver': return interaction.reply(await inv.renderInventory(interaction));
       case 'equipar': return equip(interaction);
+      case 'desequipar': return unequipCommand(interaction);
       case 'vender': return sellCommand(interaction);
       case 'fusionar': return showFuse(interaction);
       case 'recetas': return recipes(interaction);
@@ -253,6 +251,14 @@ module.exports = {
       kind: 'select', prefix: 'inv',
       async execute(interaction, args) {
         const [action, a, b] = args;
+        if (action === 'equipSel') {
+          const res = await inv.equipItem(interaction.user.id, interaction.values[0]);
+          return equipFromMenu(interaction, res, equipMessage(interaction.t, interaction.lang, res));
+        }
+        if (action === 'unequipSel') {
+          const res = await inv.unequip(interaction.user.id, interaction.values[0]);
+          return equipFromMenu(interaction, res, unequipMessage(interaction.t, interaction.lang, res));
+        }
         if (action === 'sellItem') return sellDetail(interaction, interaction.values[0]);
         if (action === 'fuseCat') return fuseItemsMenu(interaction, interaction.values[0]);
         if (action === 'fuseItems') return fuseConfirm(interaction, a, b, interaction.values);

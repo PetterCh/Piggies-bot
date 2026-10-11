@@ -1,9 +1,9 @@
 // Inventario del cerdito: pantalla, venta y fusión (crafting) de objetos.
 const crypto = require('node:crypto');
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, MessageFlags } = require('discord.js');
 const User = require('../models/User');
 const { getUser, logLedger } = require('../utils/economy');
-const { equipmentBonus } = require('./expeditions');
+const { equipmentBonus, getOpenExpedition } = require('./expeditions');
 const { t } = require('../utils/i18n');
 const { fmt } = require('../utils/helpers');
 const { ITEMS, SLOTS, RARITIES, RARITY_INFO, SELL_PRICE, FUSION, FUSION_CONSOLATION, requiredDistinct, rollItemOfType, isNormal, perksOf } = require('../data/gameData');
@@ -54,7 +54,93 @@ async function renderInventory(interaction) {
     new ButtonBuilder().setCustomId('inv:sell').setStyle(ButtonStyle.Secondary).setEmoji('💰').setLabel(t(L, 'inv.btnSell')),
     new ButtonBuilder().setCustomId('inv:fuse').setStyle(ButtonStyle.Primary).setEmoji('⚗️').setLabel(t(L, 'inv.btnFuse'))
   );
-  return { embeds: [embed], components: [row], flags: MessageFlags.Ephemeral };
+  const components = [row];
+
+  // Menú "Equipar": lo que llevas en la mochila (el mejor modelo de cada tipo primero). Máx. 25 opciones de Discord.
+  const equipIds = [...new Set(user.piggy.inventory.map((it) => it.itemId).filter((id) => ITEMS[id]))].sort((a, b) => rankOf(b) - rankOf(a) || ITEMS[b].bonus - ITEMS[a].bonus).slice(0, 25);
+  if (equipIds.length) {
+    components.push(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder().setCustomId('inv:equipSel').setPlaceholder(t(L, 'inv.equipPlaceholder'))
+        .addOptions(equipIds.map((id) => ({
+          label: `${t(L, `item.${id}`)} (+${Math.round(ITEMS[id].bonus * 100)}%)`.slice(0, 100),
+          description: `${t(L, `slot.${ITEMS[id].type}`)} · ${t(L, `rarity.${ITEMS[id].rarity}`)}`.slice(0, 100),
+          value: id,
+        })))
+    ));
+  }
+
+  // Menú "Desequipar": solo las ranuras ocupadas, más "todo" si hay más de una.
+  const filled = SLOTS.filter((sl) => eq?.[sl] && ITEMS[eq[sl]]);
+  if (filled.length) {
+    const options = filled.map((sl) => ({ label: `${t(L, `slot.${sl}`)}: ${t(L, `item.${eq[sl]}`)}`.slice(0, 100), value: sl }));
+    if (filled.length > 1) options.push({ label: t(L, 'inv.unequipAll'), value: 'all' });
+    components.push(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder().setCustomId('inv:unequipSel').setPlaceholder(t(L, 'inv.unequipPlaceholder')).addOptions(options)
+    ));
+  }
+  return { embeds: [embed], components, flags: MessageFlags.Ephemeral };
+}
+
+// ---------------- EQUIPAR / DESEQUIPAR ----------------
+/**
+ * Equipa un objeto de la mochila (la copia con más usos). Devuelve { ok, reason?, itemId, usesLeft, previous }.
+ * reason: unknown | locked | missing | fail.  Lo que llevabas puesto en esa ranura vuelve a la mochila.
+ */
+async function equipItem(discordId, itemId) {
+  const item = ITEMS[itemId];
+  if (!item) return { ok: false, reason: 'unknown' };
+  // El equipo se bloquea mientras el cerdito está fuera (así los usos y el equipo del resultado son los que salieron).
+  if (await getOpenExpedition(discordId)) return { ok: false, reason: 'locked' };
+
+  const user = await getUser(discordId);
+  const copies = user.piggy.inventory.filter((i) => i.itemId === itemId);
+  if (!copies.length) return { ok: false, reason: 'missing' };
+  const copy = copies.reduce((best, c) => ((c.usesLeft ?? Infinity) > (best.usesLeft ?? Infinity) ? c : best));
+
+  // Atómico: saca esa copia de la mochila, la equipa con sus usos y devuelve el documento ANTERIOR para recuperar lo que llevaba puesto.
+  const before = await User.findOneAndUpdate(
+    { discordId, 'piggy.inventory._id': copy._id },
+    { $pull: { 'piggy.inventory': { _id: copy._id } }, $set: { [`piggy.equipped.${item.type}`]: itemId, [`piggy.equippedUses.${item.type}`]: copy.usesLeft ?? null } },
+    { new: false }
+  );
+  if (!before) return { ok: false, reason: 'fail' };
+  const previous = before.piggy.equipped?.[item.type] || null;
+  if (previous) {
+    const prevUses = before.piggy.equippedUses?.[item.type] ?? ITEMS[previous]?.maxUses ?? null;
+    await User.updateOne({ discordId }, { $push: { 'piggy.inventory': { itemId: previous, usesLeft: prevUses } } });
+  }
+  return { ok: true, itemId, usesLeft: copy.usesLeft ?? undefined, previous };
+}
+
+/**
+ * Quita el objeto de una ranura (o de todas con 'all') y lo devuelve a la mochila CON sus usos restantes.
+ * Cada ranura es UNA sola operación atómica (quitar de la ranura + meter en la mochila), así que nunca se pierde un objeto.
+ * Devuelve { ok, reason?, removed: [itemId...] }. reason: locked | nothing | unknown.
+ */
+async function unequip(discordId, slot) {
+  const slots = slot === 'all' ? SLOTS : SLOTS.includes(slot) ? [slot] : null;
+  if (!slots) return { ok: false, reason: 'unknown' };
+  if (await getOpenExpedition(discordId)) return { ok: false, reason: 'locked' };
+
+  const removed = [];
+  for (let attempt = 0; attempt < 2 && removed.length < slots.length; attempt++) {
+    const user = await getUser(discordId);
+    for (const sl of slots) {
+      if (removed.some((r) => r.slot === sl)) continue;
+      const itemId = user.piggy.equipped?.[sl];
+      if (!itemId) continue;
+      const usesLeft = user.piggy.equippedUses?.[sl] ?? (ITEMS[itemId]?.maxUses ?? null);
+      // El filtro exige que la ranura SIGA teniendo ese objeto: si cambió entre la lectura y la escritura, no se toca nada.
+      const res = await User.updateOne(
+        { discordId, [`piggy.equipped.${sl}`]: itemId },
+        { $set: { [`piggy.equipped.${sl}`]: null, [`piggy.equippedUses.${sl}`]: null }, $push: { 'piggy.inventory': { itemId, usesLeft } } }
+      );
+      if (res.modifiedCount) removed.push({ slot: sl, itemId });
+    }
+    if (!removed.length) break; // nada equipado: no reintentar
+  }
+  if (!removed.length) return { ok: false, reason: 'nothing' };
+  return { ok: true, removed: removed.map((r) => r.itemId) };
 }
 
 // ---------------- VENTA ----------------
@@ -167,4 +253,4 @@ function takePending(token, userId) {
   return p && p.expires > Date.now() && p.userId === userId ? p : null;
 }
 
-module.exports = { renderInventory, itemLabel, perkText, countByItem, sellItems, availableRecipes, pickDisplayCopies, fuse, putPending, takePending, rankOf };
+module.exports = { renderInventory, equipItem, unequip, itemLabel, perkText, countByItem, sellItems, availableRecipes, pickDisplayCopies, fuse, putPending, takePending, rankOf };
