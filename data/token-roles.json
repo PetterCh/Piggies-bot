@@ -3,21 +3,21 @@
     {
       "nombre_referencia": "Piggies OG 1/1",
       "descripcion": "Rol para los 1/1 principales de la colección Piggies",
-      "coleccion": "Piggies",
+      "coleccion": "0x268Fba721CFD580FE98d96f1b0249f6871D1Fa09",
       "role_id": "1351589381546442813",
       "token_ids": [3, 853, 996, 999, 1021, 1022, 1026, 1131, 1138, 1147, 1148, 1149, 1150, 1152, 1154, 1155, 1156, 1157, 1158, 1159, 1160, 1161, 1162, 1164, 1180, 1200, 1450, 1616, 2087, 2641, 2947, 3343, 3517, 3600, 3712, 3790, 3993]
     },
     {
       "nombre_referencia": "Baby Piggies 1/1",
       "descripcion": "Rol para los 1/1 oficiales de Baby Piggies",
-      "coleccion": "Baby Piggies",
+      "coleccion": "0x1c3013fe5380cf600997a462ea66deaec8c11ac2",
       "role_id": "1558717427792224297",
       "token_ids": [1, 100, 132, 165, 198, 231, 264, 297, 330, 363, 396, 425, 444, 472, 501, 530, 559, 588, 627, 666, 700, 738, 777, 810, 849, 888, 915, 942, 969, 984, 996, 999]
     },
     {
       "nombre_referencia": "Community Baby Piggies 1/1",
       "descripcion": "Rol para los 1/1 creados para miembros de la comunidad",
-      "coleccion": "Baby Piggies",
+      "coleccion": "0x1c3013fe5380cf600997a462ea66deaec8c11ac2",
       "role_id": "1558768272776634431",
       "token_ids": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
     }
