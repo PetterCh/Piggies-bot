@@ -1,13 +1,11 @@
-// /inventario: TODO lo de la mochila en un solo sitio — ver, equipar, desequipar, vender, fusionar y recetas.
-// Los botones/menús (prefijo "inv") son persistentes y comparten la lógica de services/inventory.js con los subcomandos.
+// /inventario: UN solo comando sin subcomandos. Muestra el panel interactivo completo (mochila + equipo) y todo se hace con
+// sus botones y menús (equipar, desequipar, vender, fusionar). Los componentes (prefijo "inv") son persistentes y comparten
+// la lógica de services/inventory.js.
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, MessageFlags } = require('discord.js');
 const User = require('../../models/User');
 const config = require('../../config');
-const { ITEMS, RARITY_INFO, RARITIES, SELL_PRICE, FUSION, requiredDistinct, isNormal } = require('../../data/gameData');
+const { ITEMS, RARITY_INFO, SELL_PRICE, FUSION, requiredDistinct, isNormal } = require('../../data/gameData');
 const inv = require('../../services/inventory');
-const { getOpenExpedition } = require('../../services/expeditions');
-const { getUser } = require('../../utils/economy');
-const { askConfirmation } = require('../../utils/confirm');
 const { itemLabel } = require('../../utils/itemText');
 const { fmt } = require('../../utils/helpers');
 
@@ -27,17 +25,7 @@ const unequipMessage = (t, L, res) => {
   return t('unequip.done', { items: res.removed.map((id) => itemLabel(L, id)).join(', ') });
 };
 
-async function equip(interaction) {
-  const res = await inv.equipItem(interaction.user.id, interaction.options.getString('objeto', true));
-  return interaction.reply({ content: equipMessage(interaction.t, interaction.lang, res), ...eph });
-}
-
-async function unequipCommand(interaction) {
-  const res = await inv.unequip(interaction.user.id, interaction.options.getString('ranura') || 'all');
-  return interaction.reply({ content: unequipMessage(interaction.t, interaction.lang, res), ...eph });
-}
-
-/** Desde los menús de /inventario ver: aplica el cambio, y redibuja la pantalla en el mismo mensaje con el aviso encima. */
+/** Desde los menús de /inventario: aplica el cambio, y redibuja la pantalla en el mismo mensaje con el aviso encima. */
 async function equipFromMenu(interaction, res, message) {
   const { flags, ...view } = await inv.renderInventory(interaction); // update() no admite flags
   return interaction.update({ ...view, content: message });
@@ -82,28 +70,6 @@ async function doSell(interaction, itemId, qty) {
   return interaction.update({ content: t('sell.done', { n: res.n, item: itemLabel(interaction.lang, itemId), total: fmt(res.total), emoji: cur.emoji, balance: fmt(res.balance) }), components: [] });
 }
 
-/** /inventario vender objeto:… [cantidad] [todos]: atajo por comando (con confirmación). */
-async function sellCommand(interaction) {
-  const t = interaction.t;
-  await interaction.deferReply(eph);
-  const itemId = interaction.options.getString('objeto', true);
-  const item = ITEMS[itemId];
-  if (!item) return interaction.editReply(t('equip.unknown'));
-  if (item.sellable === false) return interaction.editReply(t('sell.notSellable'));
-  const user = await User.findOne({ discordId: interaction.user.id }).lean();
-  const have = (user?.piggy.inventory || []).filter((i) => i.itemId === itemId).length;
-  if (!have) return interaction.editReply(t('sell.fail'));
-  const all = interaction.options.getBoolean('todos');
-  const n = all ? have : Math.min(interaction.options.getInteger('cantidad') ?? 1, have);
-  const ok = await askConfirmation(interaction, {
-    content: t('sell.confirmSlash', { n, item: itemLabel(interaction.lang, itemId), total: fmt(SELL_PRICE[item.rarity] * n), emoji: cur.emoji }),
-  });
-  if (!ok) return;
-  const res = await inv.sellItems(interaction.user.id, itemId, all ? 'all' : n);
-  if (!res.ok) return interaction.editReply(t('sell.fail'));
-  return interaction.editReply(t('sell.done', { n: res.n, item: itemLabel(interaction.lang, itemId), total: fmt(res.total), emoji: cur.emoji, balance: fmt(res.balance) }));
-}
-
 // ======================= FUSIÓN =======================
 const recipeText = (t, type, rarity) => {
   const r = FUSION[rarity];
@@ -113,7 +79,7 @@ const recipeText = (t, type, rarity) => {
   });
 };
 
-async function showFuse(interaction) { // botón "Fusionar" o /inventario fusionar: elegir receta
+async function showFuse(interaction) { // botón "Fusionar": elegir receta
   const t = interaction.t;
   const user = await User.findOne({ discordId: interaction.user.id });
   const recipes = user ? inv.availableRecipes(user) : [];
@@ -169,70 +135,14 @@ async function doFuse(interaction, token) { // ejecutar
   return interaction.update({ content: '', embeds: [embed], components: [] });
 }
 
-// ======================= RECETAS =======================
-function recipes(interaction) {
-  const t = interaction.t;
-  const prices = RARITIES.map((r) => `${RARITY_INFO[r].emoji} ${t(`rarity.${r}`)}: **${fmt(SELL_PRICE[r])}** ${cur.emoji}`).join('\n');
-  const lines = Object.entries(FUSION).map(([r, f]) => t('fuse.recipeLine', {
-    from: `${RARITY_INFO[r].emoji} ${t(`rarity.${r}`)}`, to: `${RARITY_INFO[f.next].emoji} ${t(`rarity.${f.next}`)}`,
-    count: f.count, distinct: f.distinct, fee: fmt(f.fee), currency: cur.name, chance: Math.round(f.chance * 100),
-  })).join('\n');
-  const embed = new EmbedBuilder().setColor(0x9b59b6).setTitle(t('fuse.recipesTitle')).setDescription(t('fuse.recipesIntro'))
-    .addFields({ name: t('fuse.sellPrices'), value: prices }, { name: t('fuse.recipes'), value: lines }, { name: '\u200b', value: t('fuse.recipesFooter', { pct: 50 }) });
-  return interaction.reply({ embeds: [embed], ...eph });
-}
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('inventario')
-    .setDescription('Tu mochila: ver, equipar, desequipar, vender y fusionar objetos')
-    .setDMPermission(false)
-    .addSubcommand((s) => s.setName('ver').setDescription('Mira tu mochila y tu equipo (con botones de vender y fusionar)'))
-    .addSubcommand((s) => s.setName('equipar').setDescription('Equipa un arma, armadura o casco')
-      .addStringOption((o) => o.setName('objeto').setDescription('Objeto a equipar').setRequired(true).setAutocomplete(true)))
-    .addSubcommand((s) => s.setName('desequipar').setDescription('Quita un objeto equipado y lo devuelve a la mochila')
-      .addStringOption((o) => o.setName('ranura').setDescription('Qué quitar (por defecto, todo)')
-        .addChoices({ name: 'Arma / Weapon', value: 'weapon' }, { name: 'Armadura / Armor', value: 'armor' }, { name: 'Casco / Helmet', value: 'helmet' }, { name: 'Todo / All', value: 'all' })))
-    .addSubcommand((s) => s.setName('vender').setDescription('Vende objetos sobrantes a cambio de Coinks')
-      .addStringOption((o) => o.setName('objeto').setDescription('Objeto a vender').setRequired(true).setAutocomplete(true))
-      .addIntegerOption((o) => o.setName('cantidad').setDescription('Cuántos (por defecto 1)').setMinValue(1).setMaxValue(500))
-      .addBooleanOption((o) => o.setName('todos').setDescription('Vender todos los de ese modelo')))
-    .addSubcommand((s) => s.setName('fusionar').setDescription('Combina objetos del mismo tipo y rareza para subirlos de tier'))
-    .addSubcommand((s) => s.setName('recetas').setDescription('Precios de venta y recetas de fusión')),
-
-  // Autocompletado: equipar = todo lo que tienes; vender = solo lo vendible.
-  async autocomplete(interaction) {
-    const t = interaction.t;
-    const sellOnly = interaction.options.getSubcommand() === 'vender';
-    const focused = String(interaction.options.getFocused()).toLowerCase();
-    const user = await User.findOne({ discordId: interaction.user.id }).lean();
-    const groups = {};
-    for (const it of user?.piggy?.inventory ?? []) {
-      if (!ITEMS[it.itemId] || (sellOnly && ITEMS[it.itemId].sellable === false)) continue;
-      const g = (groups[it.itemId] ||= { n: 0, uses: -1 });
-      g.n++;
-      g.uses = Math.max(g.uses, it.usesLeft ?? -1);
-    }
-    const choices = Object.entries(groups)
-      .filter(([id]) => t(`item.${id}`).toLowerCase().includes(focused))
-      .sort((a, b) => inv.rankOf(b[0]) - inv.rankOf(a[0]))
-      .slice(0, 25)
-      .map(([id, g]) => ({
-        name: `${t(`item.${id}`)} · ${t(`slot.${ITEMS[id].type}`)} +${Math.round(ITEMS[id].bonus * 100)}%${ITEMS[id].maxUses ? ` · 🔁${g.uses}/${ITEMS[id].maxUses}` : ''}${sellOnly ? ` · ${fmt(SELL_PRICE[ITEMS[id].rarity])}${cur.emoji}` : ''} (x${g.n})`.slice(0, 100),
-        value: id,
-      }));
-    await interaction.respond(choices);
-  },
+    .setDescription('Tu mochila: equipa, vende y fusiona objetos con botones y menús')
+    .setDMPermission(false),
 
   async execute(interaction) {
-    switch (interaction.options.getSubcommand()) {
-      case 'ver': return interaction.reply(await inv.renderInventory(interaction));
-      case 'equipar': return equip(interaction);
-      case 'desequipar': return unequipCommand(interaction);
-      case 'vender': return sellCommand(interaction);
-      case 'fusionar': return showFuse(interaction);
-      case 'recetas': return recipes(interaction);
-    }
+    return interaction.reply(await inv.renderInventory(interaction));
   },
 
   components: [

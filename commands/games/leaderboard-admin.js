@@ -4,7 +4,7 @@ const { audit } = require('../../utils/adminLog');
 const { askConfirmation } = require('../../utils/confirm');
 const config = require('../../config');
 const { fmt } = require('../../utils/helpers');
-const { buildPanel, publishPanel, removePanel, myRank, getProfiles, metricLines, closeSeason, excludedIds, seasonKey } = require('../../services/leaderboard');
+const { renderPanel, publishPanel, removePanel, myRank, getProfiles, metricLines, closeSeason, excludedIds, seasonKey, roleMap, hasRoles, roleLines, RANK_KEYS } = require('../../services/leaderboard');
 
 const eph = { flags: MessageFlags.Ephemeral };
 const lastRefresh = new Map(); // guildId -> timestamp (anti-spam del botón Actualizar)
@@ -22,7 +22,7 @@ module.exports = {
           if (Date.now() - (lastRefresh.get(interaction.guildId) || 0) < 15_000) return interaction.reply({ content: t('leaderboard.cooldown'), ...eph });
           lastRefresh.set(interaction.guildId, Date.now());
           await interaction.deferUpdate();
-          return interaction.message.edit(await buildPanel(interaction.guild, cfg)).catch(() => {});
+          return interaction.message.edit(await renderPanel(interaction.guild, cfg)).catch(() => {});
         }
         // lbd:me
         await interaction.deferReply(eph);
@@ -39,7 +39,7 @@ module.exports = {
   adminOnly: true,
   data: new SlashCommandBuilder()
     .setName('leaderboard-admin')
-    .setDescription('(Admin) Liga de Ballenas: panel, exclusiones y rol mensual del Top 3')
+    .setDescription('(Admin) Liga de Ballenas: panel, exclusiones y roles por puesto')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false)
     .addSubcommand((s) => s.setName('panel').setDescription('Publica o actualiza el panel del leaderboard')
@@ -50,9 +50,13 @@ module.exports = {
     .addSubcommand((s) => s.setName('incluir').setDescription('Devuelve a una cuenta excluida al leaderboard')
       .addUserOption((o) => o.setName('usuario').setDescription('Cuenta a volver a incluir').setRequired(true)))
     .addSubcommand((s) => s.setName('excluidos').setDescription('Lista las cuentas excluidas'))
-    .addSubcommand((s) => s.setName('rol').setDescription('Rol exclusivo que se entrega cada mes al Top 3')
-      .addRoleOption((o) => o.setName('rol').setDescription('Rol premio (vacío = ver el actual)'))
-      .addBooleanOption((o) => o.setName('quitar').setDescription('Desactiva las temporadas mensuales')))
+    .addSubcommand((s) => s.setName('rol').setDescription('Roles por puesto: Top 1, Top 2, Top 3 y Top 4–10')
+      .addRoleOption((o) => o.setName('top1').setDescription('Rol exclusivo del puesto #1'))
+      .addRoleOption((o) => o.setName('top2').setDescription('Rol exclusivo del puesto #2'))
+      .addRoleOption((o) => o.setName('top3').setDescription('Rol exclusivo del puesto #3'))
+      .addRoleOption((o) => o.setName('top10').setDescription('Rol de los puestos #4 al #10'))
+      .addStringOption((o) => o.setName('quitar').setDescription('Desactiva un rol (o todos)')
+        .addChoices({ name: 'Todos / All', value: 'all' }, { name: 'Top 1', value: 'top1' }, { name: 'Top 2', value: 'top2' }, { name: 'Top 3', value: 'top3' }, { name: 'Top 4–10', value: 'top10' })))
     .addSubcommand((s) => s.setName('temporada-ahora').setDescription('Cierra la temporada ya (entrega roles y anuncia)')),
 
   async execute(interaction) {
@@ -102,23 +106,49 @@ module.exports = {
 
     if (sub === 'rol') {
       const base = { allowedMentions: { parse: [] }, ...eph };
-      if (interaction.options.getBoolean('quitar')) {
-        await updateGuildConfig(guildId, { $set: { lbRoleId: null } });
-        await audit({ guildId, action: 'leaderboard_role_off', byId: interaction.user.id });
-        return interaction.reply({ content: t('leaderboard.roleRemoved'), ...base });
+      const listOf = (c) => roleLines(interaction.lang, c);
+      const quitar = interaction.options.getString('quitar');
+      const picked = Object.fromEntries(RANK_KEYS.map(([opt]) => [opt, interaction.options.getRole(opt)]));
+      const hadRoles = hasRoles(cfg);
+
+      if (quitar) {
+        const keys = quitar === 'all' ? RANK_KEYS : RANK_KEYS.filter(([opt]) => opt === quitar);
+        const $set = Object.fromEntries(keys.map(([, field]) => [field, null]));
+        // El rol único antiguo (v7.6) equivale a Top 3: se limpia junto con él.
+        if (quitar === 'all' || quitar === 'top3') $set.lbRoleId = null;
+        await updateGuildConfig(guildId, { $set });
+        await audit({ guildId, action: 'leaderboard_role_off', byId: interaction.user.id, details: { which: quitar } });
+        return interaction.reply({ content: t('leaderboard.roleRemoved', { which: quitar === 'all' ? t('leaderboard.all') : t(`leaderboard.label${quitar === 'top10' ? 10 : quitar.slice(3)}`) }), ...base });
       }
-      const role = interaction.options.getRole('rol');
-      if (!role) return interaction.reply({ content: cfg.lbRoleId ? t('leaderboard.roleCurrent', { role: `<@&${cfg.lbRoleId}>` }) : t('leaderboard.roleNone'), ...base });
-      if (role.id === guildId) return interaction.reply({ content: t('leaderboard.everyone'), ...base });
-      // lbLastSeason = mes anterior: así no se "recupera" un cierre de un mes que ocurrió antes de configurar el rol.
-      await updateGuildConfig(guildId, { $set: { lbRoleId: role.id, lbLastSeason: seasonKey(new Date(), 1) } });
-      await audit({ guildId, action: 'leaderboard_role_set', byId: interaction.user.id, details: { roleId: role.id } });
-      const warn = role.editable ? '' : `\n${t('leaderboard.roleHierarchy')}`;
-      return interaction.reply({ content: t('leaderboard.roleSet', { role: `${role}`, tz: config.leaderboard.timezone }) + warn, ...base });
+      if (!Object.values(picked).some(Boolean)) return interaction.reply({ content: hadRoles ? t('leaderboard.roleCurrent', { list: listOf(cfg) }) : t('leaderboard.roleNone'), ...base });
+
+      const $set = {};
+      for (const [opt, field] of RANK_KEYS) {
+        const role = picked[opt];
+        if (!role) continue;
+        if (role.id === guildId) return interaction.reply({ content: t('leaderboard.everyone'), ...base });
+        $set[field] = role.id;
+      }
+      // El rol único antiguo pasa a ser Top 3 si no se reconfigura ahora.
+      if (cfg.lbRoleId) { if (!$set.lbRoleTop3 && !cfg.lbRoleTop3) $set.lbRoleTop3 = cfg.lbRoleId; $set.lbRoleId = null; }
+      const merged = { ...cfg, ...$set };
+      // Cada puesto necesita un rol distinto (si no, quitarlo de un puesto se lo quitaría al otro).
+      const seen = new Set();
+      for (const id of Object.values(roleMap(merged)).filter(Boolean)) {
+        if (seen.has(id)) return interaction.reply({ content: t('leaderboard.roleDup', { role: `<@&${id}>` }), ...base });
+        seen.add(id);
+      }
+      // lbLastSeason = mes anterior al activar por primera vez: así no se "recupera" un cierre anterior a la configuración.
+      if (!hadRoles) $set.lbLastSeason = seasonKey(new Date(), 1);
+      await updateGuildConfig(guildId, { $set });
+      await audit({ guildId, action: 'leaderboard_role_set', byId: interaction.user.id, details: $set });
+      const unmanaged = Object.values(roleMap(merged)).filter(Boolean).filter((id) => !interaction.guild.roles.cache.get(id)?.editable).map((id) => `<@&${id}>`);
+      const warn = unmanaged.length ? `\n${t('leaderboard.roleHierarchy', { roles: unmanaged.join(' ') })}` : '';
+      return interaction.reply({ content: t('leaderboard.roleSet', { list: listOf(merged), tz: config.leaderboard.timezone }) + warn, ...base });
     }
 
     // temporada-ahora
-    if (!cfg.lbRoleId) return interaction.reply({ content: t('leaderboard.noRole'), ...eph });
+    if (!hasRoles(cfg)) return interaction.reply({ content: t('leaderboard.noRole'), ...eph });
     await interaction.deferReply(eph);
     if (!(await askConfirmation(interaction, { content: t('leaderboard.closeConfirm') }))) return;
     const res = await closeSeason(interaction.client, guildId, { manual: true });

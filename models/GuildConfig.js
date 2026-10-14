@@ -27,8 +27,12 @@ const guildConfigSchema = new mongoose.Schema(
     lbChannelId: { type: String, default: null }, // canal del panel
     lbMessageId: { type: String, default: null }, // mensaje del panel (se edita en lugar de reenviar)
     lbExcludedIds: { type: [String], default: [] }, // cuentas que no aparecen en la tabla (admins, bots, el dueño...)
-    lbRoleId: { type: String, default: null }, // rol exclusivo del Top 3 mensual (null = temporadas desactivadas)
-    lbWinnerIds: { type: [String], default: [] }, // ganadores de la última temporada (para quitarles el rol si bajan)
+    lbRoleTop1: { type: String, default: null }, // rol exclusivo del puesto #1
+    lbRoleTop2: { type: String, default: null }, // rol exclusivo del puesto #2
+    lbRoleTop3: { type: String, default: null }, // rol exclusivo del puesto #3
+    lbRoleTop10: { type: String, default: null }, // rol de los puestos #4 al #10
+    lbRoleId: { type: String, default: null }, // (antiguo, v7.6) rol único del Top 3: se trata como lbRoleTop3 hasta que se reconfigure
+    lbWinnerIds: { type: [String], default: [] }, // Top 10 en el último reparto de roles, en orden (para quitar el rol a quien baje)
     lbLastSeason: { type: String, default: null }, // última temporada cerrada, formato 2026-10
   },
   { timestamps: true }

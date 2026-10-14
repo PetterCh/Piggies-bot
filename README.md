@@ -1,5 +1,13 @@
 # 🪙 Coinks Bot v7.4
 
+## Novedades v7.9
+
+1. **`/inventario` único:** sin subcomandos. Muestra directamente el panel con equipar, desequipar, vender y fusionar (botones y menús). Se eliminaron `equipar`, `desequipar`, `vender`, `fusionar` y `recetas`.
+2. **Lootbox:** solo queda `/lootbox-admin` (`panel`, `nft-agregar`, `nft-listar`, `nft-quitar`, `nft-pendientes`, `nft-entregar`); las cajas se abren desde el panel.
+3. **Leaderboard con 4 roles:** Top 1, Top 2, Top 3 y Top 4–10 (ver arriba). Un rol por puesto, sin repetir.
+4. **Embed del leaderboard:** sin `#1/#2…`, nombre en **negrita** antes del título y una línea en blanco entre jugadores. Nuevo comando público `/ballenas-chiquero` (EN `/pigsty-whales`) para ver la tabla en cualquier canal.
+⚠️ Ejecuta `npm run deploy` (cambiaron comandos).
+
 ## Novedades v7.8 — correcciones y rediseño
 
 - **Arranque:** los archivos viejos `commands/games/lootbox.js` y `commands/economy/tienda.js` ahora se **ignoran con un aviso** en vez de tumbar el bot con "Componente duplicado". Aun así, lo ideal es borrarlos (o reemplazar la carpeta completa conservando solo tu `.env`).
@@ -26,13 +34,14 @@ Cada puesto del Top 10 ahora se ve así:
 
 - **Panel:** `/leaderboard-admin panel canal:#ranking` publica un embed con el **Top 10** (🥇🥈🥉…, mención, Coinks y expediciones completadas). Se actualiza solo cada 10 min (`LEADERBOARD_REFRESH_MIN`) y tiene botones **🔄 Actualizar** y **🐷 Mi puesto** (privado). Orden: Coinks, y a igualdad, más expediciones. Solo salen miembros que siguen en el servidor y no son bots.
 - **Exclusiones:** `/leaderboard-admin excluir @usuario`, `incluir @usuario` y `excluidos`. También puedes fijar una lista negra fija en el `.env`: `LEADERBOARD_BLACKLIST_IDS=id1,id2`.
-- **Temporada mensual:** `/leaderboard-admin rol @Top3` activa el premio. El día 1 de cada mes a las 00:05 (zona `LEADERBOARD_TIMEZONE`, por defecto `CRON_TIMEZONE` o UTC; para Ecuador `America/Guayaquil`) el bot da el rol a los 3 primeros, se lo quita a quien bajó y anuncia a los ganadores en el canal de eventos (si no hay, en el del panel). Si el bot estaba apagado ese día, recupera el cierre al arrancar. `temporada-ahora` lo ejecuta manualmente (para probar).
+- **Roles por puesto (v7.9):** `/leaderboard-admin rol top1:@… top2:@… top3:@… top10:@…` (Top 10 = puestos #4–#10). Se reparten solos al refrescar el panel y al cerrar la temporada, y se quitan a quien cambia de rango. `LEADERBOARD_LIVE_ROLES=off` los deja solo para el cierre mensual.
+- **Temporada mensual:** el día 1 de cada mes a las 00:05 (zona `LEADERBOARD_TIMEZONE`, por defecto `CRON_TIMEZONE` o UTC; para Ecuador `America/Guayaquil`) el bot da el rol a los 3 primeros, se lo quita a quien bajó y anuncia a los ganadores en el canal de eventos (si no hay, en el del panel). Si el bot estaba apagado ese día, recupera el cierre al arrancar. `temporada-ahora` lo ejecuta manualmente (para probar).
 - Los Coinks **no se reinician**: la tabla es acumulada y lo que cambia cada mes es quién lleva el rol.
 - El rol del bot debe estar **por encima** del rol Top 3 y tener *Gestionar roles*. Nuevo comando → ejecuta `npm run deploy`.
 
 ## Novedades v7.5
 
-1. **Inventario por categorías** (`/inventario ver`): 🛡️ CASCO / ⚔️ ARMA / 🥋 ARMADURA, cada una ordenada de Legendario a Común, con `[Rareza] Nombre (Tienda Expedición) (+X%) - N usos`.
+1. **Inventario por categorías** (`/inventario`): 🛡️ CASCO / ⚔️ ARMA / 🥋 ARMADURA, cada una ordenada de Legendario a Común, con `[Rareza] Nombre (Tienda Expedición) (+X%) - N usos`.
 2. **Panel de cajas interactivo:** `/lootbox-admin panel canal:#cajas imagen:https://…` publica un embed con imagen configurable y 3 botones (Caja 100 / 500 / 2000 Coinks) con resumen de premios y probabilidades. `quitar-imagen:true` vuelve a la imagen por defecto (`data/media.json`, clave `lootbox.panel`) y `desactivar:true` borra el panel. Los resultados son privados por defecto (`LOOTBOX_PUBLIC=on` para hacerlos públicos). El comando `/lootbox` **fue eliminado**.
 3. **Tienda de expedición:** común/poco común/raro rotan cada 12 h; épico/legendario cada 24 h (`EXPSHOP_SLOW_ROTATION_HOURS`). Ambas frecuencias son independientes y el panel solo se republica cuando algo rota. La migración elimina sola el índice antiguo.
 
@@ -103,13 +112,12 @@ Da roles a quien tenga **tokens concretos** (por ID), con la lista y el `role_id
 
 | # | Cambio | Dónde |
 |---|--------|-------|
-| 1 | **Desequipar**: `/inventario desequipar [ranura]` y, en `/inventario ver`, menús para **equipar** y **desequipar** sin escribir nada. El objeto vuelve a la mochila **con sus usos restantes** | `commands/games/inventario.js`, `services/inventory.js` (`equipItem`, `unequip`) |
+| 1 | **Desequipar**: en `/inventario`, menús para **equipar** y **desequipar** sin escribir nada. El objeto vuelve a la mochila **con sus usos restantes** | `commands/games/inventario.js`, `services/inventory.js` (`equipItem`, `unequip`) |
 | 2 | **Inglés por defecto** (comandos, descripciones, mensajes y embeds) conservando el español para quien lo use | `config.js`, `utils/i18n.js`, `locales/commandText.js`, `utils/commandLocalization.js`, `deploy-commands.js` |
 | 3 | **Roles por categoría de rasgos**: `/nft-registrar rasgo` sin `valor` da el rol a cualquier NFT que tenga ese tipo de rasgo | `commands/nft/nft-registrar.js`, `services/nftSync.js`, `utils/blockchain.js` |
 
 ### 1. Equipar y desequipar
-- `/inventario ver` muestra la mochila con tres controles: botones *Vender*/*Fusionar*, menú **Equipar desde la mochila…** (lo mejor primero, hasta 25 modelos) y menú **Quitar equipo…** (solo las ranuras ocupadas, más *Quitar todo*). Al elegir, el mismo mensaje se redibuja.
-- `/inventario desequipar [ranura: arma|armadura|casco|todo]` (sin ranura = todo).
+- `/inventario` muestra la mochila con tres controles: botones *Vender*/*Fusionar*, menú **Equipar desde la mochila…** (lo mejor primero, hasta 25 modelos) y menú **Quitar equipo…** (solo las ranuras ocupadas, más *Quitar todo*). Al elegir, el mismo mensaje se redibuja.
 - Quitar es **una sola operación atómica por ranura** (sale de la ranura y entra a la mochila a la vez): nunca se pierde ni se duplica un objeto. Mientras el cerdito está de expedición el equipo está **bloqueado** (igual que antes; si te olvidaste algo, `/expedicion cancelar`).
 - Nota: en la v7 `equipar` vive en `/inventario` (ya no en `/expedicion`).
 
@@ -165,7 +173,7 @@ Da roles a quien tenga **tokens concretos** (por ID), con la lista y el `role_id
 
 ## Comandos
 
-- **Jugadores:** `/coinks-saldo`, `/coinks-transferir`, `/juego-colores`, `/expedicion` (enviar, estado, cancelar), `/inventario` (ver, equipar, vender, fusionar, recetas), `/idioma` (las cajas se abren con los botones del panel).
+- **Jugadores:** `/coinks-saldo`, `/coinks-transferir`, `/juego-colores`, `/expedicion` (enviar, estado, cancelar), `/inventario` (panel único con botones y menús), `/ballenas-chiquero` (EN `/pigsty-whales`), `/idioma` (las cajas se abren con los botones del panel).
 - **Admins** (Gestionar servidor): `/set-store-channel`, `/set-expedition-shop-channel`, `/set-events-channel`, `/set-logs-channel`, `/set-purchases-channel`, `/set-ping-role`, `/autoroles`, `/evento-admin`, `/tienda-admin`, `/lootbox-admin`, `/sorteo`, `/coinks-dar`, `/coinks-airdrop`, `/nft-registrar`, `/verificacion-panel`, `/wallet-desvincular`.
 - **Solo dueño/Administrador:** `/set-admin-role`.
 
@@ -292,7 +300,7 @@ El equipo **normal** rinde cada vez menos en las zonas largas (columna "eficacia
 > Pediste cuatro rarezas (Común, Raro, Épico, Legendario); el juego ya tenía también *Poco común*, así que la rareza intermedia también tiene sus 10 + 10 en vez de quitarla (habría roto inventarios existentes).
 
 ## Venta y fusión
-Desde `/inventario` (subcomandos o botones **Vender** / **Fusionar**); `/inventario recetas` muestra precios y recetas.
+Desde `/inventario` con los botones **Vender** / **Fusionar** (los menús muestran precios y recetas).
 
 - **Vender:** eliges el objeto y vendes 1 o todos los del mismo modelo. Precio por rareza: 8 / 25 / 80 / 250 / 800 Coinks (`SELL_PRICE`). La operación es atómica (no se puede vender dos veces la misma copia).
 - **Fusionar:** N objetos del **mismo tipo y rareza** → 1 objeto aleatorio de la **rareza siguiente** (mismo tipo). Escala así (`FUSION` en `data/gameData.js`):

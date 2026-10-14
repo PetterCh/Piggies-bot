@@ -137,23 +137,90 @@ function metricLines(L, prof) {
   return { luck, streak, unit };
 }
 
-/** Embed + botones del panel. */
-async function buildPanel(guild, cfg) {
+
+// ---------------- ROLES POR PUESTO ----------------
+const RANK_KEYS = [['top1', 'lbRoleTop1', 1], ['top2', 'lbRoleTop2', 2], ['top3', 'lbRoleTop3', 3], ['top10', 'lbRoleTop10', 10]];
+
+/** Roles configurados por puesto: { 1, 2, 3, 10 } (el rol único antiguo de la v7.6 cuenta como Top 3). */
+function roleMap(cfg) {
+  return { 1: cfg.lbRoleTop1 || null, 2: cfg.lbRoleTop2 || null, 3: cfg.lbRoleTop3 || cfg.lbRoleId || null, 10: cfg.lbRoleTop10 || null };
+}
+const hasRoles = (cfg) => Object.values(roleMap(cfg)).some(Boolean);
+/** Rol que corresponde a cada puesto (1-based): #1, #2, #3 y #4–#10 comparten el rol "general". */
+const roleForRank = (map, rank) => (rank <= 3 ? map[rank] : map[10]);
+
+/**
+ * Deja los roles EXACTAMENTE como toca: cada puesto con su rol, y se quita a quien tenga un rol del leaderboard que ya no le corresponde.
+ * Quién lo tiene ahora: el Top 10 del reparto anterior (guardado) + los miembros con ese rol en caché (+ todos si `fullFetch`).
+ */
+async function applyRoles(guild, cfg, top, { fullFetch = false } = {}) {
   const L = langForGuild(guild);
+  const map = roleMap(cfg);
+  const res = { warnings: [], changed: 0 };
+  const desired = new Map(); // roleId -> Set(userId)
+  top.forEach((p, i) => {
+    const rid = roleForRank(map, i + 1);
+    if (rid) (desired.get(rid) || desired.set(rid, new Set()).get(rid)).add(p.id);
+  });
+  if (fullFetch) await guild.members.fetch().catch(() => {});
+  const prev = cfg.lbWinnerIds || [];
+  const bad = [];
+  for (const rid of new Set(Object.values(map).filter(Boolean))) {
+    const role = await guild.roles.fetch(rid).catch(() => null);
+    if (!role) { res.warnings.push(t(L, 'leaderboard.warnRoleMissing')); continue; }
+    const want = desired.get(rid) || new Set();
+    let failed = false;
+    for (const id of new Set([...prev, ...role.members.keys()])) {
+      if (want.has(id)) continue;
+      const m = guild.members.cache.get(id) || (await guild.members.fetch(id).catch(() => null));
+      if (!m?.roles.cache.has(rid)) continue;
+      if (await m.roles.remove(role, 'Leaderboard: cambió de puesto').then(() => true).catch(() => false)) res.changed++; else failed = true;
+    }
+    for (const id of want) {
+      const m = guild.members.cache.get(id);
+      if (!m || m.roles.cache.has(rid)) continue;
+      if (await m.roles.add(role, 'Leaderboard: puesto asignado').then(() => true).catch(() => false)) res.changed++; else failed = true;
+    }
+    if (failed) bad.push(`<@&${rid}>`);
+  }
+  if (bad.length) res.warnings.push(t(L, 'leaderboard.warnRole'));
+  return res;
+}
+
+/** Calcula el Top 10, reparte los roles (si están activos) y devuelve el payload del panel. Lo usan el panel, su refresco y el botón. */
+async function renderPanel(guild, cfg, { syncRoles = config.leaderboard.liveRoles } = {}) {
   const top = await computeTop(guild, cfg);
+  if (syncRoles && hasRoles(cfg)) {
+    await applyRoles(guild, cfg, top).catch((e) => console.error('[leaderboard] roles:', e.message));
+    const ids = top.map((p) => p.id);
+    if (ids.join() !== (cfg.lbWinnerIds || []).join()) await updateGuildConfig(guild.id, { $set: { lbWinnerIds: ids } }).catch(() => {});
+  }
+  return buildPanel(guild, cfg, { top });
+}
+
+/** "🥇 Top 1: @rol\n🥈 Top 2: @rol…" solo de los puestos con rol. */
+function roleLines(L, cfg) {
+  const map = roleMap(cfg);
+  return RANK_KEYS.filter(([,, rank]) => map[rank]).map(([,, rank]) => t(L, 'leaderboard.roleLine', { label: t(L, `leaderboard.label${rank}`), role: `<@&${map[rank]}>` })).join('\n');
+}
+
+/** Embed + botones del panel. */
+async function buildPanel(guild, cfg, { top: given } = {}) {
+  const L = langForGuild(guild);
+  const top = given || (await computeTop(guild, cfg));
   const profiles = await getProfiles(top.map((p) => p.id)).catch((e) => { console.error('[leaderboard] métricas:', e.message); return new Map(); });
   const list = top.length
     ? top.map((p, i) => t(L, 'leaderboard.entry', {
       medal: MEDALS[i], rank: i + 1, user: `<@${p.id}>`, coinks: fmt(p.coinks), exp: fmt(p.exp),
       ...metricLines(L, profiles.get(p.id) || { luck: null, attempts: 0, streak: 0 }),
       tag: i < 3 ? ` — ${t(L, `leaderboard.tag${i + 1}`)}` : '',
-    })).join('\n')
+    })).join('\n\n')
     : t(L, 'leaderboard.empty');
   const embed = new EmbedBuilder().setColor(0xf1c40f)
     .setTitle(t(L, 'leaderboard.title'))
     .setDescription(t(L, 'leaderboard.desc', { list }))
     .addFields(
-      { name: t(L, 'leaderboard.prizeName'), value: cfg.lbRoleId ? t(L, 'leaderboard.prize', { role: `<@&${cfg.lbRoleId}>` }) : t(L, 'leaderboard.prizeNone') },
+      { name: t(L, 'leaderboard.prizeName'), value: hasRoles(cfg) ? t(L, 'leaderboard.prize', { roles: roleLines(L, cfg) }) : t(L, 'leaderboard.prizeNone') },
       { name: '\u200b', value: `*${t(L, 'leaderboard.metricsNote')}*` }
     )
     .setFooter({ text: t(L, 'leaderboard.footer', { season: seasonKey(), min: config.leaderboard.refreshMinutes }) })
@@ -171,7 +238,7 @@ async function publishPanel(client, guildId, channelId) {
   const guild = client.guilds.cache.get(guildId);
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!guild || !channel?.isTextBased() || !channel.permissionsFor(guild.members.me)?.has(NEEDED)) return null;
-  const payload = await buildPanel(guild, cfg);
+  const payload = await renderPanel(guild, cfg);
 
   if (cfg.lbMessageId && cfg.lbChannelId) {
     const oldCh = await client.channels.fetch(cfg.lbChannelId).catch(() => null);
@@ -205,7 +272,7 @@ async function refreshAll(client) {
       const ch = await client.channels.fetch(cfg.lbChannelId).catch(() => null);
       const msg = ch ? await ch.messages.fetch(cfg.lbMessageId).catch(() => null) : null;
       if (!guild || !msg) continue;
-      await msg.edit(await buildPanel(guild, cfg));
+      await msg.edit(await renderPanel(guild, cfg));
     } catch (e) { console.error('[leaderboard] refresco:', e.message); }
   }
 }
@@ -233,48 +300,34 @@ async function closeSeason(client, guildId, { season, manual = false } = {}) {
   const cfg = await getGuildConfig(guildId);
   const guild = client.guilds.cache.get(guildId);
   const res = { winners: [], warnings: [] };
-  if (!guild || !cfg.lbRoleId) return res;
+  if (!guild || !hasRoles(cfg)) return res;
   const L = langForGuild(guild);
   season = season || seasonKey(new Date(), 1);
 
-  const role = await guild.roles.fetch(cfg.lbRoleId).catch(() => null);
-  const top = await computeTop(guild, cfg, 3);
-  res.winners = top;
-  const winnerIds = top.map((p) => p.id);
-
-  if (!role) res.warnings.push(t(L, 'leaderboard.warnRoleMissing'));
-  else {
-    // Quién tiene el rol ahora: los ganadores guardados + los miembros que lo tengan en caché.
-    await guild.members.fetch().catch(() => {});
-    const holders = new Set([...(cfg.lbWinnerIds || []), ...role.members.keys()]);
-    for (const id of holders) {
-      if (winnerIds.includes(id)) continue;
-      const m = guild.members.cache.get(id) || (await guild.members.fetch(id).catch(() => null));
-      if (m?.roles.cache.has(role.id) && !(await m.roles.remove(role, 'Leaderboard: bajó del Top 3').then(() => true).catch(() => false))) res.roleError = true;
-    }
-    for (const id of winnerIds) {
-      const m = guild.members.cache.get(id);
-      if (m && !m.roles.cache.has(role.id) && !(await m.roles.add(role, `Leaderboard: Top 3 de ${season}`).then(() => true).catch(() => false))) res.roleError = true;
-    }
-    if (res.roleError) res.warnings.push(t(L, 'leaderboard.warnRole'));
-  }
+  const top = await computeTop(guild, cfg, config.leaderboard.size);
+  res.winners = top.slice(0, 3);
+  const winnerIds = res.winners.map((p) => p.id);
+  const applied = await applyRoles(guild, cfg, top, { fullFetch: true });
+  res.warnings.push(...applied.warnings);
 
   // Anuncio en el canal de eventos (o en el del panel).
   const channelId = cfg.eventsChannelId || cfg.lbChannelId;
   const ch = channelId ? await client.channels.fetch(channelId).catch(() => null) : null;
   if (!ch?.isTextBased() || !ch.permissionsFor(guild.members.me)?.has(NEEDED)) res.warnings.push(t(L, 'leaderboard.warnAnnounce'));
   else {
-    const list = top.length
-      ? top.map((p, i) => t(L, 'leaderboard.annEntry', { medal: MEDALS[i], user: `<@${p.id}>`, coinks: fmt(p.coinks), exp: fmt(p.exp) })).join('\n')
+    const list = res.winners.length
+      ? res.winners.map((p, i) => t(L, 'leaderboard.annEntry', { medal: MEDALS[i], user: `<@${p.id}>`, coinks: fmt(p.coinks), exp: fmt(p.exp) })).join('\n')
       : t(L, 'leaderboard.annNobody');
+    const map = roleMap(cfg);
+    const roles = [1, 2, 3].filter((r) => map[r]).map((r) => `<@&${map[r]}>`).join(' ');
     const embed = new EmbedBuilder().setColor(0xf1c40f)
       .setTitle(t(L, 'leaderboard.annTitle', { season }))
-      .setDescription(`${t(L, 'leaderboard.annDesc', { list })}${role && top.length ? `\n\n${t(L, 'leaderboard.annRole', { role: `<@&${role.id}>` })}` : ''}`)
+      .setDescription(`${t(L, 'leaderboard.annDesc', { list })}${roles && res.winners.length ? `\n\n${t(L, 'leaderboard.annRole', { roles })}` : ''}`)
       .setFooter({ text: t(L, 'leaderboard.annFooter') }).setTimestamp();
     await ch.send({ embeds: [embed], allowedMentions: { users: winnerIds, roles: [] } }).catch(() => res.warnings.push(t(L, 'leaderboard.warnAnnounce')));
   }
 
-  const $set = { lbWinnerIds: winnerIds };
+  const $set = { lbWinnerIds: top.map((p) => p.id) };
   if (!manual) $set.lbLastSeason = season;
   await updateGuildConfig(guildId, { $set });
   return res;
@@ -283,7 +336,7 @@ async function closeSeason(client, guildId, { season, manual = false } = {}) {
 /** Cierra el mes anterior en los servidores a los que les toca (también recupera cierres perdidos si el bot estuvo apagado). */
 async function closeDue(client) {
   const prev = seasonKey(new Date(), 1);
-  const cfgs = await GuildConfig.find({ lbRoleId: { $ne: null } }).lean();
+  const cfgs = await GuildConfig.find({ $or: [{ lbRoleTop1: { $ne: null } }, { lbRoleTop2: { $ne: null } }, { lbRoleTop3: { $ne: null } }, { lbRoleTop10: { $ne: null } }, { lbRoleId: { $ne: null } }] }).lean();
   for (const cfg of cfgs) {
     if (cfg.lbLastSeason === prev) continue;
     try {
@@ -293,4 +346,4 @@ async function closeDue(client) {
   }
 }
 
-module.exports = { getProfiles, luckScore, streakFrom, metricLines, computeTop, buildPanel, publishPanel, removePanel, refreshAll, myRank, closeSeason, closeDue, seasonKey, excludedIds, NEEDED };
+module.exports = { renderPanel, applyRoles, roleMap, hasRoles, roleLines, RANK_KEYS, getProfiles, luckScore, streakFrom, metricLines, computeTop, buildPanel, publishPanel, removePanel, refreshAll, myRank, closeSeason, closeDue, seasonKey, excludedIds, NEEDED };

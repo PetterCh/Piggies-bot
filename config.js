@@ -52,6 +52,7 @@ module.exports = {
     seasonCron: process.env.LEADERBOARD_SEASON_CRON || '5 0 1 * *', // día 1 de cada mes, 00:05
     refreshMinutes: Number(process.env.LEADERBOARD_REFRESH_MIN) || 10, // refresco automático del panel
     size: 10,
+    liveRoles: process.env.LEADERBOARD_LIVE_ROLES !== 'off', // true = los roles por puesto se actualizan al refrescar el panel; 'off' = solo al cerrar la temporada
     // IDs de Discord que NUNCA salen en la tabla (separados por comas). Se suman a los que añadas con /leaderboard-admin excluir.
     blacklistIds: (process.env.LEADERBOARD_BLACKLIST_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
   },
