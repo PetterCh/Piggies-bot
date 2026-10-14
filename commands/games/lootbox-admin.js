@@ -1,22 +1,45 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder, MessageFlags } = require('discord.js');
 const NftPrize = require('../../models/NftPrize');
 const WalletLink = require('../../models/WalletLink');
 const { normalizeAddress } = require('../../utils/blockchain');
 const { audit } = require('../../utils/adminLog');
 const { t: tr, langForUser } = require('../../utils/i18n');
 const { UserError, escapeRegex } = require('../../utils/helpers');
+const config = require('../../config');
+const { getGuildConfig, updateGuildConfig } = require('../../utils/guildConfig');
+const { openBox } = require('../../services/lootbox');
+const { publishLootboxPanel, removeLootboxPanel } = require('../../services/lootboxPanel');
 
 const eph = { flags: MessageFlags.Ephemeral };
 const isId = (s) => /^[a-f\d]{24}$/i.test(s);
 const label = (p) => `${p.name}${p.contractAddress ? ` (${p.network} #${p.tokenId ?? '?'})` : ''}`;
 
 module.exports = {
+  // Botones del panel de cajas (públicos: los usa cualquier jugador). customId: lb:open:<caja>  ·  lb:again:<caja>:<userId>
+  components: [
+    {
+      kind: 'button',
+      prefix: 'lb',
+      async execute(interaction, args) {
+        const [action, boxId, ownerId] = args;
+        if (action === 'open') return openBox(interaction, boxId, { ephemeral: config.lootbox.ephemeral });
+        // "abrir otra": solo quien abrió la caja. Si el mensaje es privado, sigue siendo privado.
+        if (interaction.user.id !== ownerId) return interaction.reply({ content: interaction.t('lootbox.notYours'), ...eph });
+        return openBox(interaction, boxId, { again: true, ephemeral: !!interaction.message.flags?.has(MessageFlags.Ephemeral) });
+      },
+    },
+  ],
   adminOnly: true, // la comprobación real vive en events/interactionCreate.js
   data: new SlashCommandBuilder()
     .setName('lootbox-admin')
-    .setDescription('(Admin) Gestiona los NFT que se entregan como premio en las cajas')
+    .setDescription('(Admin) Panel de cajas y NFT que se entregan como premio')
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false)
+    .addSubcommand((s) => s.setName('panel').setDescription('Publica o actualiza el panel interactivo de cajas')
+      .addChannelOption((o) => o.setName('canal').setDescription('Canal del panel (vacío = el actual)').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+      .addStringOption((o) => o.setName('imagen').setDescription('URL https del arte del panel'))
+      .addBooleanOption((o) => o.setName('quitar-imagen').setDescription('Quita la imagen personalizada'))
+      .addBooleanOption((o) => o.setName('desactivar').setDescription('Borra el panel del canal')))
     .addSubcommand((s) => s.setName('nft-agregar').setDescription('Carga un NFT como premio (1 registro = 1 NFT)')
       .addStringOption((o) => o.setName('nombre').setDescription('Nombre del premio').setRequired(true).setMaxLength(80))
       .addStringOption((o) => o.setName('contrato').setDescription('Contrato del NFT (opcional, informativo)'))
@@ -48,6 +71,23 @@ module.exports = {
 
     try {
       switch (interaction.options.getSubcommand()) {
+        case 'panel': {
+          if (interaction.options.getBoolean('desactivar')) {
+            await removeLootboxPanel(interaction.client, guildId);
+            await audit({ guildId, action: 'lootbox_panel_off', byId: interaction.user.id });
+            return interaction.editReply(t('lootboxPanel.removed'));
+          }
+          const image = interaction.options.getString('imagen')?.trim();
+          if (image && !/^https:\/\/\S{4,480}$/i.test(image)) throw new UserError(t('lootboxPanel.badImage'));
+          if (image || interaction.options.getBoolean('quitar-imagen')) await updateGuildConfig(guildId, { $set: { lootboxPanelImage: image || null } });
+          const channel = interaction.options.getChannel('canal');
+          const cfg = await getGuildConfig(guildId);
+          const targetId = channel?.id || cfg.lootboxPanelChannelId || interaction.channelId;
+          const msg = await publishLootboxPanel(interaction.client, guildId, targetId);
+          if (!msg) throw new UserError(t('lootboxPanel.noPerms', { channel: `<#${targetId}>` }));
+          await audit({ guildId, action: 'lootbox_panel_set', byId: interaction.user.id, details: { channelId: targetId, image: image || null } });
+          return interaction.editReply(t('lootboxPanel.published', { url: msg.url }));
+        }
         case 'nft-agregar': {
           const contractRaw = interaction.options.getString('contrato');
           const contract = contractRaw ? normalizeAddress(contractRaw) : null;

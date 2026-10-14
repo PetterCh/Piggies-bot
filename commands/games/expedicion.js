@@ -35,27 +35,33 @@ module.exports = {
     const discordId = interaction.user.id;
     const sub = interaction.options.getSubcommand();
 
+    // Lo PRIMERO: confirmar la interacción (Discord da solo 3 s). `enviar` se anuncia en público;
+    // el resto (estado / cancelar / antiguos) es privado.
+    await interaction.deferReply(sub === 'enviar' ? {} : eph);
+
     // ---------------- ENVIAR ----------------
     if (sub === 'enviar') {
       const zone = ZONES[interaction.options.getString('zona', true)];
+      // Avisos de error: la respuesta diferida es pública, así que se borra y el aviso se manda en privado.
+      const warn = async (content) => {
+        await interaction.deleteReply().catch(() => {});
+        return interaction.followUp({ content, ...eph });
+      };
 
       // REGLA: una sola expedición activa. Si ya hay una, se avisa cuándo regresa.
       const open = await getOpenExpedition(discordId);
       if (open) {
         const z = ZONES[open.zoneId];
-        return interaction.reply({
-          content: open.status === 'resolving'
-            ? t('expedition.busyResolving')
-            : t('expedition.busy', { emoji: z.emoji, zone: t(`zone.${z.id}.name`), when: `<t:${unix(open.endsAt)}:R>` }),
-          ...eph,
-        });
+        return warn(open.status === 'resolving'
+          ? t('expedition.busyResolving')
+          : t('expedition.busy', { emoji: z.emoji, zone: t(`zone.${z.id}.name`), when: `<t:${unix(open.endsAt)}:R>` }));
       }
 
       let exp;
       try {
         exp = await startExpedition({ discordId, guildId: interaction.guildId, channelId: interaction.channelId, zoneId: zone.id, lang: L });
       } catch (err) {
-        if (err.code === 11000) return interaction.reply({ content: t('expedition.busyShort'), ...eph });
+        if (err.code === 11000) return warn(t('expedition.busyShort'));
         throw err;
       }
       const ev = exp.eventId ? EVENTS[exp.eventId] : null;
@@ -74,7 +80,7 @@ module.exports = {
         );
       // Arte: el GIF/WEBP de media.json de ESA zona (expedition.start.<zona> → expedition.start).
       const { files } = withMedia(embed, [`expedition.start.${zone.id}`, 'expedition.start']);
-      return interaction.reply({ embeds: [embed], files });
+      return interaction.editReply({ embeds: [embed], files });
     }
 
     // ---------------- ESTADO ----------------
@@ -82,21 +88,19 @@ module.exports = {
       const active = await getOpenExpedition(discordId);
       if (active) {
         const z = ZONES[active.zoneId];
-        return interaction.reply({
+        return interaction.editReply({
           content: active.status === 'resolving' ? t('expedition.statusResolving') : `${t('expedition.statusActive', { emoji: z.emoji, zone: t(`zone.${z.id}.name`), when: `<t:${unix(active.endsAt)}:R>` })}\n${t('expedition.cancelHint')}`,
-          ...eph,
         });
       }
       const last = await Expedition.findOne({ discordId, status: 'completed' }).sort({ completedAt: -1 });
-      if (!last) return interaction.reply({ content: t('expedition.statusIdle'), ...eph });
+      if (!last) return interaction.editReply({ content: t('expedition.statusIdle') });
       const r = last.result;
       const txt = r.survived ? t('expedition.lastAlive', { coins: fmt(r.coinks), item: r.droppedItem ? t('expedition.lastItem', { item: itemLabel(L, r.droppedItem) }) : '' }) : t('expedition.lastDead');
-      return interaction.reply({ content: t('expedition.statusLast', { zone: t(`zone.${last.zoneId}.name`), result: txt }), ...eph });
+      return interaction.editReply({ content: t('expedition.statusLast', { zone: t(`zone.${last.zoneId}.name`), result: txt }) });
     }
 
     // ---------------- CANCELAR ----------------
     if (sub === 'cancelar') {
-      await interaction.deferReply(eph);
       const check = await cancelExpedition(discordId, interaction.guildId, { dryRun: true });
       if (!check.ok) return interaction.editReply(t(`cancel.${check.reason}`));
       const ok = await askConfirmation(interaction, {
@@ -109,6 +113,6 @@ module.exports = {
     }
 
     // Subcomandos antiguos (equipar / inventario / recetas) que pueden seguir registrados en Discord si no se ejecutó `npm run deploy`.
-    return interaction.reply({ content: t('expedition.moved'), ...eph });
+    return interaction.editReply({ content: t('expedition.moved') });
   },
 };

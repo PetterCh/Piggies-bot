@@ -55,15 +55,30 @@ function oddsLines(box, L, t) {
   });
 }
 
+const busy = new Set(); // usuarios con una apertura en curso (evita cobrar dos veces por un doble clic)
+
 /**
- * Abre una caja. Sirve para el comando slash y para el botón "abrir otra" (interaction.isButton()).
+ * Abre una caja desde el panel (botón lb:open) o con "abrir otra" (botón lb:again, `again: true`).
+ *  - ephemeral: el resultado lo ve SOLO quien abre (así el canal del panel no se llena). Con "abrir otra" se hereda del mensaje.
  * Orden: cobrar -> responder al instante (animación) -> sortear/entregar -> revelar. Si algo falla tras cobrar, se reembolsa.
  */
-async function openBox(interaction, boxId) {
+async function openBox(interaction, boxId, { again = false, ephemeral = true } = {}) {
   const t = interaction.t;
   const box = BOXES[boxId];
   const eph = { flags: MessageFlags.Ephemeral };
   if (!box) return interaction.reply({ content: t('lootbox.unknown'), ...eph });
+  if (busy.has(interaction.user.id)) return interaction.reply({ content: t('lootbox.busy'), ...eph });
+  busy.add(interaction.user.id);
+  try {
+    return await openBoxLocked(interaction, box, { again, ephemeral });
+  } finally {
+    busy.delete(interaction.user.id);
+  }
+}
+
+async function openBoxLocked(interaction, box, { again, ephemeral }) {
+  const t = interaction.t;
+  const eph = { flags: MessageFlags.Ephemeral };
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
   const cur = config.currency;
@@ -80,12 +95,15 @@ async function openBox(interaction, boxId) {
   const opening = new EmbedBuilder().setColor(0xf5a623).setTitle(`${box.emoji} ${t('lootbox.opening', { box: boxName })}`).setDescription(t('lootbox.openingDesc'));
   const m = withMedia(opening, ['lootbox.opening']);
   let edit;
-  if (interaction.isButton()) {
+  if (again && interaction.isButton() && !ephemeral) {
     await interaction.update({ components: [] }); // quita el botón del mensaje anterior
     const msg = await interaction.followUp({ embeds: [opening], files: m.files });
     edit = (p) => interaction.webhook.editMessage(msg.id, { attachments: [], ...p });
+  } else if (again && interaction.isButton()) {
+    await interaction.update({ embeds: [opening], files: m.files, components: [] }); // mensaje privado: se transforma en la animación
+    edit = (p) => interaction.editReply({ attachments: [], ...p });
   } else {
-    await interaction.reply({ embeds: [opening], files: m.files });
+    await interaction.reply({ embeds: [opening], files: m.files, ...(ephemeral ? eph : {}) });
     edit = (p) => interaction.editReply({ attachments: [], ...p });
   }
 
@@ -139,7 +157,7 @@ async function openBox(interaction, boxId) {
   embed.addFields({ name: t('lootbox.fNet'), value: `${net >= 0 ? '+' : ''}${fmt(net)} ${cur.emoji}`, inline: true });
   if (!hasWallet) embed.setFooter({ text: t('lootbox.walletHint') });
 
-  const again = new ButtonBuilder()
+  const againBtn = new ButtonBuilder()
     .setCustomId(`lb:again:${box.id}:${userId}`)
     .setStyle(outcome.type === 'nothing' ? ButtonStyle.Danger : ButtonStyle.Primary)
     .setLabel(t(outcome.type === 'nothing' ? 'lootbox.revenge' : 'lootbox.again', { price: fmt(box.price) }))
@@ -147,7 +165,7 @@ async function openBox(interaction, boxId) {
   const media = withMedia(embed, [`lootbox.${rar}`]);
   // Anuncio público en el canal de logs (con @everyone en premios épicos/legendarios o NFT de alto valor)
   announceWin(interaction.client, interaction.guild, { user: interaction.user, box, outcome, prize }).catch((e) => console.error('[lootbox] anuncio:', e.message));
-  return edit({ embeds: [embed], files: media.files, components: [new ActionRowBuilder().addComponents(again)] });
+  return edit({ embeds: [embed], files: media.files, components: [new ActionRowBuilder().addComponents(againBtn)] });
 }
 
 module.exports = { openBox, oddsLines, rollOutcome };

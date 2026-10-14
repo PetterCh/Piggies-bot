@@ -20,6 +20,16 @@ const guildConfigSchema = new mongoose.Schema(
     nextEventAt: { type: Date, default: null }, // cuándo puede aparecer el siguiente evento sorpresa
     lastEventType: { type: String, default: null },
     expShopChannelId: { type: String, default: null }, // canal de la tienda de expedición rotativa
+    lootboxPanelChannelId: { type: String, default: null }, // canal del panel interactivo de cajas
+    lootboxPanelMessageId: { type: String, default: null }, // mensaje del panel (se edita en lugar de reenviar)
+    lootboxPanelImage: { type: String, default: null }, // URL https del arte del panel (si no, media.json: lootbox.panel)
+    // Leaderboard "Liga de Ballenas del Chiquero"
+    lbChannelId: { type: String, default: null }, // canal del panel
+    lbMessageId: { type: String, default: null }, // mensaje del panel (se edita en lugar de reenviar)
+    lbExcludedIds: { type: [String], default: [] }, // cuentas que no aparecen en la tabla (admins, bots, el dueño...)
+    lbRoleId: { type: String, default: null }, // rol exclusivo del Top 3 mensual (null = temporadas desactivadas)
+    lbWinnerIds: { type: [String], default: [] }, // ganadores de la última temporada (para quitarles el rol si bajan)
+    lbLastSeason: { type: String, default: null }, // última temporada cerrada, formato 2026-10
   },
   { timestamps: true }
 );

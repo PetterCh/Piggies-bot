@@ -46,6 +46,16 @@ module.exports = {
     },
   },
 
+  // Leaderboard mensual. Zona horaria del cierre de mes: LEADERBOARD_TIMEZONE (o CRON_TIMEZONE, o UTC).
+  leaderboard: {
+    timezone: process.env.LEADERBOARD_TIMEZONE || process.env.CRON_TIMEZONE || 'UTC',
+    seasonCron: process.env.LEADERBOARD_SEASON_CRON || '5 0 1 * *', // día 1 de cada mes, 00:05
+    refreshMinutes: Number(process.env.LEADERBOARD_REFRESH_MIN) || 10, // refresco automático del panel
+    size: 10,
+    // IDs de Discord que NUNCA salen en la tabla (separados por comas). Se suman a los que añadas con /leaderboard-admin excluir.
+    blacklistIds: (process.env.LEADERBOARD_BLACKLIST_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
+  },
+
   colorGame: { defaultEntry: 100, minEntry: 1, maxEntry: 100000, lobbySeconds: 30, minPlayers: 2, roundDelayMs: 3000 },
 
   expeditions: { checkIntervalMs: 30_000 },
@@ -59,7 +69,8 @@ module.exports = {
 
 
 
-  lootbox: { openDelayMs: 2500 },
+  // ephemeral=true: el resultado de abrir una caja desde el panel lo ve solo quien la abre. LOOTBOX_PUBLIC=on lo hace público en el canal.
+  lootbox: { openDelayMs: 2500, ephemeral: process.env.LOOTBOX_PUBLIC !== 'on' },
 
   // Eventos globales sorpresa: tras terminar uno, el siguiente aparece pasadas entre minGapHours y maxGapHours.
   events: { checkIntervalMs: 60_000, minGapHours: 8, maxGapHours: 72 },
@@ -68,5 +79,10 @@ module.exports = {
   purchases: { highlightMinCoins: Number(process.env.PURCHASE_HIGHLIGHT_MIN) || 5000 },
 
   // Tienda de expedición rotativa
-  expShop: { rotationHours: Number(process.env.EXPSHOP_ROTATION_HOURS) || 12, checkIntervalMs: 60_000 },
+  // Dos frecuencias INDEPENDIENTES: común/poco común/raro rotan cada `rotationHours` (12 h) y épico/legendario cada `slowRotationHours` (24 h).
+  expShop: {
+    rotationHours: Number(process.env.EXPSHOP_ROTATION_HOURS) || 12,
+    slowRotationHours: Number(process.env.EXPSHOP_SLOW_ROTATION_HOURS) || 24,
+    checkIntervalMs: 60_000,
+  },
 };

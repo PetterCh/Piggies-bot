@@ -19,6 +19,56 @@ function countByItem(user) {
   return counts;
 }
 
+// Orden de las categorías de la mochila (casco, arma, armadura).
+const BAG_ORDER = ['helmet', 'weapon', 'armor'];
+
+/** Línea de un objeto de la mochila: "[Épico] Hacha (Tienda Expedición) (+22%) ✨ - 3 usos" (+ " x2" si hay copias iguales). */
+function bagLine(L, id, { uses, qty } = {}) {
+  const it = ITEMS[id];
+  let line = `• [${t(L, `rarity.${it.rarity}`)}] ${t(L, `item.${id}`)}`;
+  if (it.source === 'shop' || it.source === 'event') line += ` ${t(L, `inv.src.${it.source}`)}`;
+  line += ` (+${Math.round(it.bonus * 100)}%)`;
+  if (it.perk) line += ' ✨';
+  if (it.maxUses) line += t(L, 'inv.usesLeft', { n: uses ?? it.maxUses });
+  if (qty > 1) line += ` x${qty}`;
+  return line;
+}
+
+/**
+ * Mochila agrupada por categoría (casco / arma / armadura) y, dentro de cada una, de mayor a menor rareza
+ * (los únicos de evento arriba del todo; a igual rareza, mejor bonus primero). Devuelve campos de embed (1 por categoría con objetos).
+ * Los exclusivos (usos limitados) van uno por línea con sus usos; los normales se agrupan con cantidad.
+ */
+function bagFields(L, inventory) {
+  const groups = Object.fromEntries(BAG_ORDER.map((sl) => [sl, { limited: [], normal: {} }]));
+  for (const it of inventory) {
+    const def = ITEMS[it.itemId];
+    if (!def || !groups[def.type]) continue;
+    if (isNormal(it.itemId)) groups[def.type].normal[it.itemId] = (groups[def.type].normal[it.itemId] || 0) + 1;
+    else groups[def.type].limited.push(it);
+  }
+  const cmp = (a, b) => rankOf(b.id) - rankOf(a.id) || ITEMS[b.id].bonus - ITEMS[a.id].bonus || t(L, `item.${a.id}`).localeCompare(t(L, `item.${b.id}`)) || (b.uses ?? 0) - (a.uses ?? 0);
+  const fields = [];
+  for (const sl of BAG_ORDER) {
+    const g = groups[sl];
+    const entries = [
+      ...g.limited.map((it) => ({ id: it.itemId, uses: it.usesLeft })),
+      ...Object.entries(g.normal).map(([id, qty]) => ({ id, qty })),
+    ].sort(cmp);
+    if (!entries.length) continue;
+    const lines = [];
+    let len = 0;
+    for (const [i, e] of entries.entries()) {
+      const line = bagLine(L, e.id, e);
+      if (len + line.length + 1 > 940) { lines.push(t(L, 'inv.more', { n: entries.length - i })); break; } // límite de 1024 caracteres por campo
+      lines.push(line);
+      len += line.length + 1;
+    }
+    fields.push({ name: t(L, `inv.cat.${sl}`), value: lines.join('\n') });
+  }
+  return fields.length ? fields : [{ name: t(L, 'inv.bag'), value: t(L, 'inv.empty') }];
+}
+
 /** Pantalla de inventario con botones de venta y fusión. Devuelve el payload para reply(). */
 async function renderInventory(interaction) {
   const L = interaction.lang;
@@ -26,18 +76,6 @@ async function renderInventory(interaction) {
   const eq = user.piggy.equipped;
   const uses = user.piggy.equippedUses || {};
 
-  // Objetos normales: agrupados con cantidad. Exclusivos (usos limitados): uno por línea con sus usos restantes.
-  const normal = {};
-  const limited = [];
-  for (const it of user.piggy.inventory) {
-    if (!ITEMS[it.itemId]) continue;
-    if (isNormal(it.itemId)) normal[it.itemId] = (normal[it.itemId] || 0) + 1;
-    else limited.push(it);
-  }
-  const lines = [
-    ...limited.sort((a, b) => rankOf(b.itemId) - rankOf(a.itemId)).map((it) => itemLabel(L, it.itemId, it.usesLeft)),
-    ...Object.entries(normal).sort((a, b) => rankOf(b[0]) - rankOf(a[0])).map(([id, n]) => `${itemLabel(L, id)} x${n}`),
-  ];
   const perks = perksOf(eq);
   const s = user.piggy.stats;
   const embed = new EmbedBuilder().setColor(0xe91e63).setTitle(`🐷 ${user.piggy.name}`).addFields(
@@ -47,7 +85,7 @@ async function renderInventory(interaction) {
         `\n${t(L, 'inv.bonus', { bonus: pct(equipmentBonus(eq)) })}` +
         (perks.loot || perks.revive ? `\n${t(L, 'inv.perks', { loot: Math.round(perks.loot * 100), revive: Math.round(perks.revive * 100) })}` : ''),
     },
-    { name: t(L, 'inv.bag'), value: (lines.join('\n') || t(L, 'inv.empty')).slice(0, 1000) },
+    ...bagFields(L, user.piggy.inventory),
     { name: t(L, 'inv.stats'), value: t(L, 'inv.statsLine', { exp: s.expeditions, ok: s.survived, dead: s.deaths, loot: fmt(s.totalLoot) }) }
   );
   const row = new ActionRowBuilder().addComponents(
@@ -253,4 +291,4 @@ function takePending(token, userId) {
   return p && p.expires > Date.now() && p.userId === userId ? p : null;
 }
 
-module.exports = { renderInventory, equipItem, unequip, itemLabel, perkText, countByItem, sellItems, availableRecipes, pickDisplayCopies, fuse, putPending, takePending, rankOf };
+module.exports = { bagFields, bagLine, renderInventory, equipItem, unequip, itemLabel, perkText, countByItem, sellItems, availableRecipes, pickDisplayCopies, fuse, putPending, takePending, rankOf };

@@ -21,6 +21,18 @@ async function run() {
     if (err.codeName !== 'NamespaceNotFound' && err.code !== 26) throw err; // colección aún inexistente = nada que migrar
   }
 
+  // 1b) tienda de expedición: el índice único antiguo (guildId, slot) se reemplaza por (guildId, tier, slot)
+  try {
+    const col = db.collection('expshoprotations');
+    const old = (await col.indexes()).find((i) => i.name === 'guildId_1_slot_1');
+    if (old) {
+      await col.dropIndex('guildId_1_slot_1');
+      console.log('[migración] Tienda de expedición: índice antiguo (guildId, slot) eliminado; ahora hay rotación rápida y lenta');
+    }
+  } catch (err) {
+    if (err.codeName !== 'NamespaceNotFound' && err.code !== 26) throw err;
+  }
+
   // 2) expediciones duplicadas
   const exps = db.collection('expeditions');
   const dups = await exps

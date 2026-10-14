@@ -1,5 +1,36 @@
 # 🪙 Coinks Bot v7.4
 
+## Novedades v7.7 — Suerte y constancia en el leaderboard
+
+Cada puesto del Top 10 ahora se ve así:
+
+```
+🥇 #1 @Usuario — Ballena Suprema 🐋
+💰 Coinks: 45,200 | 🗺️ Expediciones: 128
+🍀 Suerte: 78% (Buena estrella) | 🔥 Constancia: 12 días (Imparable)
+```
+
+- **🍀/📉 Suerte (1–99 %):** intento = apertura de caja o expedición completada; acierto = premio Épico/Legendario (o NFT). Se compara la tasa del jugador con la **media de todo el servidor** (50 % = igual que el promedio; el triple = 75 %; la mitad = 33 %), suavizada para que 1 acierto en 1 intento no dé 99 %. Con menos de 5 intentos sale "sin datos (novato)". Etiquetas: Bendecido ≥85, Buena estrella ≥65, Equilibrado ≥40, Mala racha ≥20, Pura mula <20.
+- **🔥 Constancia:** días seguidos con alguna expedición enviada o caja abierta (día según `LEADERBOARD_TIMEZONE`; la racha sigue viva si hoy aún no jugaste pero ayer sí). Etiquetas: Dormido 0, Calentando 1-2, Constante 3-6, Imparable 7-13, Leyenda 14+.
+- El botón **🐷 Mi puesto** también muestra tu suerte y tu constancia.
+- No hace falta migrar nada ni ejecutar `npm run deploy`: se calcula con los historiales que ya guarda el bot. Exclusiones, roles mensuales y anuncio de temporada no cambian.
+
+## Novedades v7.6 — Liga de Ballenas del Chiquero (leaderboard)
+
+- **Panel:** `/leaderboard-admin panel canal:#ranking` publica un embed con el **Top 10** (🥇🥈🥉…, mención, Coinks y expediciones completadas). Se actualiza solo cada 10 min (`LEADERBOARD_REFRESH_MIN`) y tiene botones **🔄 Actualizar** y **🐷 Mi puesto** (privado). Orden: Coinks, y a igualdad, más expediciones. Solo salen miembros que siguen en el servidor y no son bots.
+- **Exclusiones:** `/leaderboard-admin excluir @usuario`, `incluir @usuario` y `excluidos`. También puedes fijar una lista negra fija en el `.env`: `LEADERBOARD_BLACKLIST_IDS=id1,id2`.
+- **Temporada mensual:** `/leaderboard-admin rol @Top3` activa el premio. El día 1 de cada mes a las 00:05 (zona `LEADERBOARD_TIMEZONE`, por defecto `CRON_TIMEZONE` o UTC; para Ecuador `America/Guayaquil`) el bot da el rol a los 3 primeros, se lo quita a quien bajó y anuncia a los ganadores en el canal de eventos (si no hay, en el del panel). Si el bot estaba apagado ese día, recupera el cierre al arrancar. `temporada-ahora` lo ejecuta manualmente (para probar).
+- Los Coinks **no se reinician**: la tabla es acumulada y lo que cambia cada mes es quién lleva el rol.
+- El rol del bot debe estar **por encima** del rol Top 3 y tener *Gestionar roles*. Nuevo comando → ejecuta `npm run deploy`.
+
+## Novedades v7.5
+
+1. **Inventario por categorías** (`/inventario ver`): 🛡️ CASCO / ⚔️ ARMA / 🥋 ARMADURA, cada una ordenada de Legendario a Común, con `[Rareza] Nombre (Tienda Expedición) (+X%) - N usos`.
+2. **Panel de cajas interactivo:** `/lootbox-admin panel canal:#cajas imagen:https://…` publica un embed con imagen configurable y 3 botones (Caja 100 / 500 / 2000 Coinks) con resumen de premios y probabilidades. `quitar-imagen:true` vuelve a la imagen por defecto (`data/media.json`, clave `lootbox.panel`) y `desactivar:true` borra el panel. Los resultados son privados por defecto (`LOOTBOX_PUBLIC=on` para hacerlos públicos). El comando `/lootbox` **fue eliminado**.
+3. **Tienda de expedición:** común/poco común/raro rotan cada 12 h; épico/legendario cada 24 h (`EXPSHOP_SLOW_ROTATION_HOURS`). Ambas frecuencias son independientes y el panel solo se republica cuando algo rota. La migración elimina sola el índice antiguo.
+
+⚠️ Ejecuta `npm run deploy` (cambiaron comandos).
+
 ## Novedades de la v7.4: el bot llena solo el índice de Token IDs
 
 Ya no tienes que cargar nada a mano. `tasks/tokenOwnersTask.js` mantiene el índice de los grupos 1/1 en segundo plano:
@@ -115,7 +146,7 @@ Da roles a quien tenga **tokens concretos** (por ID), con la lista y el `role_id
 | 6 | **Auto-roles por botones** (eventos, drops, novedades) sin `@everyone` | `/autoroles`, `/set-ping-role` |
 | 7 | **Limpieza:** retirados `/evento`, `/tienda` (ver/comprar/compras), `/tienda-expedicion` y los subcomandos de inventario dentro de `/expedicion` | ver tabla de abajo |
 
-**Fuera de esta versión (a propósito):** la animación de apertura de cajas estilo Counter-Strike. Quedó fuera porque pediste "únicamente" estos puntos; `/lootbox` es exactamente el de la v4. Se puede añadir después como cambio aparte.
+**Fuera de esta versión (a propósito):** la animación de apertura de cajas estilo Counter-Strike. Quedó fuera porque pediste "únicamente" estos puntos; las cajas son las de la v4 (ahora con panel, ver v7.5). Se puede añadir después como cambio aparte.
 
 ## Actualizar desde la v4 (importante)
 
@@ -127,7 +158,7 @@ Da roles a quien tenga **tokens concretos** (por ID), con la lista y el `role_id
 
 ## Comandos
 
-- **Jugadores:** `/coinks-saldo`, `/coinks-transferir`, `/juego-colores`, `/expedicion` (enviar, estado, cancelar), `/inventario` (ver, equipar, vender, fusionar, recetas), `/lootbox`, `/idioma`.
+- **Jugadores:** `/coinks-saldo`, `/coinks-transferir`, `/juego-colores`, `/expedicion` (enviar, estado, cancelar), `/inventario` (ver, equipar, vender, fusionar, recetas), `/idioma` (las cajas se abren con los botones del panel).
 - **Admins** (Gestionar servidor): `/set-store-channel`, `/set-expedition-shop-channel`, `/set-events-channel`, `/set-logs-channel`, `/set-purchases-channel`, `/set-ping-role`, `/autoroles`, `/evento-admin`, `/tienda-admin`, `/lootbox-admin`, `/sorteo`, `/coinks-dar`, `/coinks-airdrop`, `/nft-registrar`, `/verificacion-panel`, `/wallet-desvincular`.
 - **Solo dueño/Administrador:** `/set-admin-role`.
 
@@ -275,7 +306,7 @@ Si falla, se pierden los objetos y se devuelve el 50% de su valor de venta; la t
 - **Tienda:** `/tienda-admin agregar` (tipo *Rol* = entrega automática; *Manual* = pedido pendiente que un admin entrega con `/tienda-admin entregar`). Los pedidos manuales avisan en `ADMIN_LOG_CHANNEL_ID`.
 - **Sorteos:** `/sorteo crear duracion:2h premio-coinks:500 ganadores:3 costo:50` (el costo es opcional; 0 = gratis). Se cierran solos y sobreviven a reinicios.
 - **NFT como premio de caja:** `/lootbox-admin nft-agregar` (1 registro = 1 NFT). Cuando alguien lo gana, queda reservado y se avisa a los admins; **tú lo envías a mano** a la wallet vinculada del ganador y lo marcas con `/lootbox-admin nft-entregar`. El bot **nunca custodia NFTs ni claves privadas**.
-- **Balance de cajas:** edita `data/lootboxes.js` y ejecuta `npm run lootbox:ev` para ver probabilidades y retorno esperado antes de publicar. `/lootbox probabilidades` las muestra a los jugadores.
+- **Balance de cajas:** edita `data/lootboxes.js` y ejecuta `npm run lootbox:ev` para ver probabilidades y retorno esperado antes de publicar. El panel de cajas muestra a los jugadores un resumen de las probabilidades.
 
 ## GIF / WEBP
 
@@ -331,7 +362,7 @@ npm start
 
 - **El panel de wallets no prueba que seas el dueño de la dirección** (Collab.Land sí, porque pide firmar un mensaje en una web). Aquí cualquiera puede escribir la dirección pública de otra persona. Mitigaciones incluidas: confirmación, una wallet = una cuenta, y `/wallet-desvincular` para corregir suplantaciones. Si los roles o los NFT premio tienen valor real, añade verificación por firma (SIWE) en el punto `onModalSubmit` de `verificacion-panel.js`.
 - Los NFT premio exigen wallet vinculada y se entregan manualmente. Antes de entregar, comprueba la wallet y, si te preocupa la suplantación, verifica al ganador por otra vía.
-- Las cajas son una mecánica de azar con premios de valor real (NFT). Si algún día los Coinks se pueden comprar con dinero, revisa la normativa de *loot boxes* de tus países. Las probabilidades son públicas con `/lootbox probabilidades`.
+- Las cajas son una mecánica de azar con premios de valor real (NFT). Si algún día los Coinks se pueden comprar con dinero, revisa la normativa de *loot boxes* de tus países. Las probabilidades son públicas en el panel de cajas.
 - Roles por rasgo: requieren contratos ERC721Enumerable y metadatos accesibles. Ronin se trata como EVM. Usa RPC propios (Alchemy, Infura…).
 - Las URIs de metadatos las define el contrato: el bot hace peticiones HTTP a ellas. Registra solo colecciones en las que confíes.
 - Los premios en Coinks de sorteos se pagan como máximo una vez por ganador, incluso si el bot se reinicia a mitad del reparto (en un caso extremo podría quedar sin pagar uno; el error se registra en consola).

@@ -5,6 +5,7 @@ const expeditionTask = require('../tasks/expeditionTask');
 const giveawayTask = require('../tasks/giveawayTask');
 const eventTask = require('../tasks/eventTask');
 const expShopTask = require('../tasks/expShopTask');
+const leaderboardTask = require('../tasks/leaderboardTask');
 
 module.exports = {
   name: Events.ClientReady,
@@ -17,5 +18,6 @@ module.exports = {
     giveawayTask.start(readyClient);
     eventTask.start(readyClient);
     expShopTask.start(readyClient);
+    leaderboardTask.start(readyClient);
   },
 };

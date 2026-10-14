@@ -13,11 +13,13 @@ const itemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// Una rotación = un "escaparate" de ~10 objetos que dura rotationHours (por defecto 12 h = 2 rotaciones al día).
+// Una rotación = el escaparate de UN nivel: 'fast' (común, poco común, raro: cada 12 h) o 'slow' (épico y legendario: cada 24 h).
+// Cada nivel tiene su propia cuenta de franjas y rota por su cuenta. (Las rotaciones antiguas, sin `tier`, mezclaban todo y caducan solas.)
 const expShopRotationSchema = new mongoose.Schema(
   {
     guildId: { type: String, required: true },
-    slot: { type: Number, required: true }, // floor(ahora / duración): identifica la rotación de forma única
+    tier: { type: String, enum: ['fast', 'slow'], default: 'fast' },
+    slot: { type: Number, required: true }, // floor(ahora / duración del nivel): identifica la rotación de forma única
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },
     items: { type: [itemSchema], default: [] },
@@ -27,6 +29,6 @@ const expShopRotationSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-expShopRotationSchema.index({ guildId: 1, slot: 1 }, { unique: true }); // impide crear dos veces la misma rotación
+expShopRotationSchema.index({ guildId: 1, tier: 1, slot: 1 }, { unique: true }); // impide crear dos veces la misma rotación del mismo nivel
 
 module.exports = mongoose.model('ExpShopRotation', expShopRotationSchema);
