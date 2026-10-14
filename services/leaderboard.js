@@ -146,7 +146,7 @@ async function buildPanel(guild, cfg) {
     ? top.map((p, i) => t(L, 'leaderboard.entry', {
       medal: MEDALS[i], rank: i + 1, user: `<@${p.id}>`, coinks: fmt(p.coinks), exp: fmt(p.exp),
       ...metricLines(L, profiles.get(p.id) || { luck: null, attempts: 0, streak: 0 }),
-      tag: i < 3 ? ` — *${t(L, `leaderboard.tag${i + 1}`)}*` : '',
+      tag: i < 3 ? ` — ${t(L, `leaderboard.tag${i + 1}`)}` : '',
     })).join('\n')
     : t(L, 'leaderboard.empty');
   const embed = new EmbedBuilder().setColor(0xf1c40f)

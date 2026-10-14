@@ -85,11 +85,9 @@ async function deleteMessages(client, channelId, ids) {
 async function clearPanels(client, guildId) {
   for (const rot of await ExpShopRotation.find({ guildId, published: true })) {
     await deleteMessages(client, rot.channelId, [rot.headerMessageId, ...rot.items.map((i) => i.messageId)]);
-    rot.items.forEach((i) => { i.messageId = null; });
-    rot.published = false;
-    rot.headerMessageId = null;
-    rot.channelId = null;
-    await rot.save();
+    // updateOne (NO rot.save()): en rotaciones antiguas sin `tier`, save() les escribía tier:'fast' por el valor por defecto
+    // y chocaba con el índice único (guildId, tier, slot) de la rotación nueva -> E11000.
+    await ExpShopRotation.updateOne({ _id: rot._id }, { $set: { published: false, headerMessageId: null, channelId: null, 'items.$[].messageId': null } });
   }
 }
 
@@ -126,16 +124,20 @@ async function publishPanel(client, rotIds, { announce = false } = {}) {
 async function ensureTier(guildId, tier) {
   const slot = currentSlot(tier);
   const ms = TIERS[tier].ms;
-  let rot = await ExpShopRotation.findOne({ guildId, tier, slot });
-  if (rot) return { rot, created: false };
+  const existing = await ExpShopRotation.findOne({ guildId, tier, slot });
+  if (existing) return { rot: existing, created: false };
   const prev = await ExpShopRotation.findOne({ guildId, tier }).sort({ slot: -1 });
-  try {
-    rot = await ExpShopRotation.create({ guildId, tier, slot, startsAt: new Date(slot * ms), endsAt: new Date((slot + 1) * ms), items: pickItems(tier, prev?.items.map((i) => i.itemId)) });
-    return { rot, created: true };
-  } catch (err) {
-    if (err.code !== 11000) throw err;
-    return { rot: await ExpShopRotation.findOne({ guildId, tier, slot }), created: false }; // otra ejecución la creó justo antes
+  const fresh = { startsAt: new Date(slot * ms), endsAt: new Date((slot + 1) * ms), items: pickItems(tier, prev?.items.map((i) => i.itemId)), published: false };
+  // Upsert atómico por (guildId, tier, slot): si dos ejecuciones coinciden, solo una inserta y la otra recibe la misma rotación.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await ExpShopRotation.findOneAndUpdate({ guildId, tier, slot }, { $setOnInsert: fresh }, { upsert: true, new: true, includeResultMetadata: true });
+      return { rot: res.value, created: !res.lastErrorObject?.updatedExisting };
+    } catch (err) {
+      if (err.code !== 11000) throw err; // carrera de upserts simultáneos: reintenta y lee la existente
+    }
   }
+  return { rot: await ExpShopRotation.findOne({ guildId, tier, slot }), created: false };
 }
 
 /**

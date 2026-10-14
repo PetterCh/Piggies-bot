@@ -1,5 +1,12 @@
 # 🪙 Coinks Bot v7.4
 
+## Novedades v7.8 — correcciones y rediseño
+
+- **Arranque:** los archivos viejos `commands/games/lootbox.js` y `commands/economy/tienda.js` ahora se **ignoran con un aviso** en vez de tumbar el bot con "Componente duplicado". Aun así, lo ideal es borrarlos (o reemplazar la carpeta completa conservando solo tu `.env`).
+- **Tienda de expedición (E11000):** la causa era que al limpiar el panel se re-guardaban las rotaciones antiguas (sin `tier`) y Mongoose les ponía `tier: 'fast'`, chocando con la rotación nueva del mismo slot. Ahora (1) se limpian con `updateOne`, (2) la migración marca las antiguas como `legacy`, elimina duplicados y corrige un índice no único, y (3) la creación de rotaciones es un `upsert` atómico. Todo se aplica solo al arrancar; no hace falta borrar índices a mano.
+- **Leaderboard:** cada puesto en 3 líneas exactas: `🥇 #1 @Usuario — Título` / `🏛️ Coinks: 91,166 • 🗺️ Expeditions: 13` / `🍀 Luck: 43% (Balanced) • 🔥 Streak: 4 days (Steady)`.
+- **Inventario:** esferas de rareza (🟡 Legendario, 🟣 Épico, 🔵 Raro, 🟢 Poco común, ⚪ Común; el legendario pasó de 🟠 a 🟡 en todo el bot), bonus en negrita, usos como `7/9 usos`, copias idénticas agrupadas con `x2`, y una línea de aire entre categorías.
+
 ## Novedades v7.7 — Suerte y constancia en el leaderboard
 
 Cada puesto del Top 10 ahora se ve así:

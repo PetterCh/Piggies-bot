@@ -9,10 +9,19 @@ function* walk(dir) {
   }
 }
 
+// Archivos de versiones anteriores que ya no existen. Si quedaron en la carpeta del bot (copiar encima en vez de reemplazar),
+// se IGNORAN con un aviso en lugar de romper el arranque con "Componente duplicado". Puedes borrarlos sin problema.
+const RETIRED_FILES = ['games/lootbox.js', 'economy/tienda.js'];
+
 /** Carga todos los comandos (commands/**) con forma { data, execute, autocomplete?, components? }. */
 function loadCommands(baseDir) {
   const commands = new Map();
   for (const file of walk(baseDir)) {
+    const rel = path.relative(baseDir, file).split(path.sep).join('/');
+    if (RETIRED_FILES.includes(rel)) {
+      console.warn(`[loader] commands/${rel} es de una versión antigua y se ignora (puedes borrarlo).`);
+      continue;
+    }
     const cmd = require(file);
     if (!cmd.data || typeof cmd.execute !== 'function') {
       console.warn(`[loader] ${file} ignorado: debe exportar { data, execute }`);

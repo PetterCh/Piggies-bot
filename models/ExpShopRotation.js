@@ -18,7 +18,7 @@ const itemSchema = new mongoose.Schema(
 const expShopRotationSchema = new mongoose.Schema(
   {
     guildId: { type: String, required: true },
-    tier: { type: String, enum: ['fast', 'slow'], default: 'fast' },
+    tier: { type: String, enum: ['fast', 'slow', 'legacy'], default: 'fast' },
     slot: { type: Number, required: true }, // floor(ahora / duración del nivel): identifica la rotación de forma única
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },

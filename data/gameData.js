@@ -11,7 +11,7 @@ const RARITY_INFO = {
   uncommon:  { emoji: '🟢', weight: 25, coinks: [30, 75],   color: 0x2ecc71 },
   rare:      { emoji: '🔵', weight: 10, coinks: [100, 200], color: 0x3498db },
   epic:      { emoji: '🟣', weight: 4,  coinks: [300, 500], color: 0x9b59b6 },
-  legendary: { emoji: '🟠', weight: 1,  coinks: [750, 1000], color: 0xe67e22 },
+  legendary: { emoji: '🟡', weight: 1,  coinks: [750, 1000], color: 0xe67e22 },
   event:     { emoji: '🌟', color: 0xe91e63 }, // rareza única de los objetos de evento (no entra en sorteos normales)
 };
 

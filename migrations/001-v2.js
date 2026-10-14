@@ -29,6 +29,27 @@ async function run() {
       await col.dropIndex('guildId_1_slot_1');
       console.log('[migración] Tienda de expedición: índice antiguo (guildId, slot) eliminado; ahora hay rotación rápida y lenta');
     }
+    // Rotaciones antiguas (sin `tier`, mezclaban todos los niveles): se marcan 'legacy' para que NUNCA choquen con las rápidas/lentas
+    // (el valor por defecto 'fast' las hacía colisionar en el índice único al re-guardarlas).
+    const mark = await col.updateMany({ tier: { $exists: false } }, { $set: { tier: 'legacy' } });
+    if (mark.modifiedCount) console.log(`[migración] Tienda de expedición: ${mark.modifiedCount} rotaciones antiguas marcadas como legacy`);
+    // Si por algún motivo quedaron duplicados (guildId, tier, slot), se conserva la más reciente: el índice único necesita datos limpios.
+    const dups = await col.aggregate([
+      { $sort: { updatedAt: -1, _id: -1 } },
+      { $group: { _id: { g: '$guildId', t: '$tier', s: '$slot' }, ids: { $push: '$_id' }, n: { $sum: 1 } } },
+      { $match: { n: { $gt: 1 } } },
+    ]).toArray();
+    for (const d of dups) {
+      const [, ...extra] = d.ids;
+      await col.deleteMany({ _id: { $in: extra } });
+      console.log(`[migración] Tienda de expedición: ${extra.length} rotaciones duplicadas eliminadas (slot ${d._id.s}, ${d._id.t})`);
+    }
+    // Un índice con ese nombre que NO sea único (o de otra forma) impediría crear el correcto: se borra y Mongoose lo recrea.
+    const cur = (await col.indexes()).find((i) => i.name === 'guildId_1_tier_1_slot_1');
+    if (cur && !cur.unique) {
+      await col.dropIndex('guildId_1_tier_1_slot_1');
+      console.log('[migración] Tienda de expedición: índice (guildId, tier, slot) no único eliminado para recrearlo');
+    }
   } catch (err) {
     if (err.codeName !== 'NamespaceNotFound' && err.code !== 26) throw err;
   }

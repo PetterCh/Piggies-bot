@@ -22,14 +22,14 @@ function countByItem(user) {
 // Orden de las categorías de la mochila (casco, arma, armadura).
 const BAG_ORDER = ['helmet', 'weapon', 'armor'];
 
-/** Línea de un objeto de la mochila: "[Épico] Hacha (Tienda Expedición) (+22%) ✨ - 3 usos" (+ " x2" si hay copias iguales). */
+/** Línea de un objeto de la mochila: "🟣 Corona Abisal **(+20%)** ✨ `7/7 usos` x2" (x2 = copias idénticas agrupadas). */
 function bagLine(L, id, { uses, qty } = {}) {
   const it = ITEMS[id];
-  let line = `• [${t(L, `rarity.${it.rarity}`)}] ${t(L, `item.${id}`)}`;
+  let line = `${RARITY_INFO[it.rarity].emoji} ${t(L, `item.${id}`)}`;
   if (it.source === 'shop' || it.source === 'event') line += ` ${t(L, `inv.src.${it.source}`)}`;
-  line += ` (+${Math.round(it.bonus * 100)}%)`;
+  line += ` **(+${Math.round(it.bonus * 100)}%)**`;
   if (it.perk) line += ' ✨';
-  if (it.maxUses) line += t(L, 'inv.usesLeft', { n: uses ?? it.maxUses });
+  if (it.maxUses) line += ` ${t(L, 'inv.usesLeft', { n: uses ?? it.maxUses, max: it.maxUses })}`;
   if (qty > 1) line += ` x${qty}`;
   return line;
 }
@@ -45,14 +45,19 @@ function bagFields(L, inventory) {
     const def = ITEMS[it.itemId];
     if (!def || !groups[def.type]) continue;
     if (isNormal(it.itemId)) groups[def.type].normal[it.itemId] = (groups[def.type].normal[it.itemId] || 0) + 1;
-    else groups[def.type].limited.push(it);
+    else {
+      // exclusivos idénticos (mismo objeto y mismos usos restantes) = una sola línea con x2, x3…
+      const key = `${it.itemId}|${it.usesLeft ?? def.maxUses}`;
+      const g = groups[def.type].limited.find((e) => e.key === key);
+      if (g) g.qty++; else groups[def.type].limited.push({ key, id: it.itemId, uses: it.usesLeft, qty: 1 });
+    }
   }
   const cmp = (a, b) => rankOf(b.id) - rankOf(a.id) || ITEMS[b.id].bonus - ITEMS[a.id].bonus || t(L, `item.${a.id}`).localeCompare(t(L, `item.${b.id}`)) || (b.uses ?? 0) - (a.uses ?? 0);
   const fields = [];
   for (const sl of BAG_ORDER) {
     const g = groups[sl];
     const entries = [
-      ...g.limited.map((it) => ({ id: it.itemId, uses: it.usesLeft })),
+      ...g.limited.map(({ id, uses, qty }) => ({ id, uses, qty })),
       ...Object.entries(g.normal).map(([id, qty]) => ({ id, qty })),
     ].sort(cmp);
     if (!entries.length) continue;
@@ -64,7 +69,7 @@ function bagFields(L, inventory) {
       lines.push(line);
       len += line.length + 1;
     }
-    fields.push({ name: t(L, `inv.cat.${sl}`), value: lines.join('\n') });
+    fields.push({ name: t(L, `inv.cat.${sl}`), value: `${lines.join('\n')}\n\u200b` }); // línea en blanco final = aire entre categorías
   }
   return fields.length ? fields : [{ name: t(L, 'inv.bag'), value: t(L, 'inv.empty') }];
 }
