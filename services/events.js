@@ -28,7 +28,7 @@ async function getActiveEvent(guildId) {
 const invalidate = (guildId) => cache.delete(guildId);
 
 const signed = (n) => `${n > 0 ? '+' : n < 0 ? '-' : '±'}${Math.round(Math.abs(n) * 100)}%`;
-const effectsText = (L, def) => t(L, 'event.effects', { survival: signed(def.survivalDelta), coins: def.coinMult, chance: Math.round(def.dropChance * 100) });
+const effectsText = (L, def) => t(L, 'event.effects', { survival: signed(def.survivalDelta), coins: Math.round(def.coinBonus * 100), chance: Math.round(def.dropChance * 100) });
 
 /** Menciones del anuncio: el rol de eventos (inicio y fin) y, solo al empezar y si está activado, @everyone. */
 function pingPayload(cfg, { everyone }) {

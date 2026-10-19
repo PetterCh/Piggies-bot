@@ -138,6 +138,7 @@ module.exports = {
   expedition: {
     eventBanner: "{emoji} Active event: **{name}** (applies to this expedition)",
     gearEffNote: "⚠️ In this zone your **normal** gear only performs at {pct}%; the rotating shop's **exclusive** gear performs at 100%.",
+    bossWarn: "☠️ Boss zone: if the expedition fails, there is a {chance}% chance of an ambush that steals {steal}% of the Coinks in your wallet (max {max}).",
     lowSurvival: "💀 VERY dangerous zone: your chance of coming back is low. Consider gear from the Expedition Shop or cancel with `/expedicion cancelar`.",
     fReward: "Reward multiplier",
     fDuration: "Duration",
@@ -165,7 +166,13 @@ module.exports = {
       item: "Gear found",
       broken: "Broken gear",
       uses: "Uses left",
+      stolen: "Stolen by the boss",
       eventItem: "Unique event item!",
+    },
+    boss: {
+      ruinas: ["The Ruins Guardian ambushed your piggy and snatched **{coins}** Coinks from its pouch!", "An ancient curse awoke: the Ruins Guardian emptied **{coins}** Coinks from its pocket."],
+      abismo: ["The Abyss Leviathan ambushed your piggy and snatched **{coins}** Coinks from its pouch!", "Something huge crawled out of the dark and gobbled up **{coins}** of your piggy's Coinks. Not even a thank-you."],
+      trono: ["The Dragon ambushed your piggy and snatched **{coins}** Coinks from its pouch!", "The Dragon King laughed, belched a flame and kept **{coins}** of your piggy's Coinks. The hoard grows."],
     },
     death: {
       bosque: [
@@ -417,6 +424,7 @@ module.exports = {
     coinks: "🪙 Coinks **{pct}%** ({min}–{max})",
     gear: "🎒 Gear **{pct}%** (up to {best} {bestPct}%)",
     nft: "🏆 NFT **{pct}%**",
+    set: "⚔️🛡️⛑️ Full set **100%**: 3 🟣/🟡 items with limited uses · 🟡 per piece **{pct}%** (at least 1 🟡 guaranteed)",
     btn: "{price} {currency} box",
     published: "✅ Box panel published: {url}",
     removed: "✅ Box panel removed.",
@@ -435,11 +443,12 @@ module.exports = {
     again: "Open another ({price})",
     busy: "⏳ You are already opening a box, hold on a moment.",
     notYours: "❌ That button belongs to someone else. Open your own box from the lootbox panel.",
-    box: { basica: "Basic Box", premium: "Premium Box", legendaria: "Legendary Box" },
+    box: { basica: "Basic Box", premium: "Premium Box", legendaria: "Legendary Box", mitica: "Mythic Box" },
     boxDesc: {
       basica: "To get started. Pretty good odds of getting little… and some chance of getting a lot.",
       premium: "Better gear and big Coinks prizes.",
       legendaria: "The best odds for legendary gear, huge Coinks and real NFTs.",
+      mitica: "A full set (weapon, armor and helmet) of epic/legendary gear with limited uses. Always at least one legendary piece.",
     },
     odds: {
       nothing: "❌ Nothing — **{pct}%**",
@@ -459,6 +468,8 @@ module.exports = {
     result: {
       coinks: "💰 The box spat out **{coinks}** Coinks ({rarity}).",
       gear: "🎒 Inside there was **{item}** ({rarity})! {slot} with +{bonus}% survival. It's already in your piggy's backpack (`/inventario`).",
+      uses: "uses",
+      set: "💎 The Mythic Box dropped a **full set**! It is already in your piggy's backpack (`/inventario`):\n{items}",
       nft: "🏆 UNBELIEVABLE!!! You won the NFT **{name}**! An admin will send it to your linked wallet.",
       nothing: [
         "📦 Empty. Completely empty. Even the piggy looked at it with pity.",
@@ -526,6 +537,7 @@ module.exports = {
     coinks: "{user} pulled **{coinks}** Coinks ({rarity}).",
     gear: "{user} pulled **{item}** ({rarity}) — {slot} with +{bonus}% survival.",
     nft: "🏆 {user} won the NFT **{name}**.",
+    set: "💎 {user} opened a Mythic Box and pulled a full set:\n{items}",
     hypeEpic: [
       "🚨 {user} just pulled **{prize}** from a box! EPIC prize!",
       "🔥 Hype! {user} opened a box and got **{prize}**.",
@@ -636,7 +648,7 @@ module.exports = {
     choice: "{emoji} {name}",
     endsAt: "Ends {when}.",
     items: "Unique items that can drop",
-    effects: "Survival **{survival}** · Coinks **x{coins}** · **{chance}%** chance of a unique item on every successful expedition",
+    effects: "Survival **{survival}** · Coinks **+{coins}%** · **{chance}%** chance of a unique item on every successful expedition",
     startTitle: "{emoji} {name}!",
     prizeTitle: "{emoji} {name} prize!",
     prizeLine: "🎉 {user} got **{item}**!",
@@ -662,10 +674,10 @@ module.exports = {
     },
     fiebre_del_oro: {
       name: "Gold Rush",
-      desc: "A gold vein was discovered: Coinks rewards are doubled and unique golden items drop.",
+      desc: "A gold vein was discovered: Coinks rewards are boosted by 50% and unique golden items drop.",
       start: [
-        "💰 Gold vein discovered! During the **Gold Rush** all Coinks loot is **doubled** and unique **golden items** can drop. Start digging!",
-        "💰 The piggies smell gold in the air. **Gold Rush** activated! Expeditions pay double.",
+        "💰 Gold vein discovered! During the **Gold Rush** Coinks loot is boosted by **50%** and unique **golden items** can drop. Start digging!",
+        "💰 The piggies smell gold in the air. **Gold Rush** activated! Expeditions pay 50% more.",
       ],
       end: "The Gold Rush is over: the vein ran dry. Time to spend your winnings.",
       prize: ["💰 {user} found **{item}** among the gold nuggets!", "💰 Fortune smiles on {user}: **{item}**!"],

@@ -5,7 +5,7 @@ const Expedition = require('../../models/Expedition');
 const { startExpedition, getOpenExpedition, cancelExpedition } = require('../../services/expeditions');
 const { askConfirmation } = require('../../utils/confirm');
 const { itemLabel } = require('../../utils/itemText');
-const { ZONES, SLOTS } = require('../../data/gameData');
+const { ZONES, SLOTS, BOSS } = require('../../data/gameData');
 const { EVENTS } = require('../../data/events');
 const config = require('../../config');
 const { choice, t: tr } = require('../../utils/i18n');
@@ -69,6 +69,7 @@ module.exports = {
       if (ev) desc.push(t('expedition.eventBanner', { emoji: ev.emoji, name: t(`event.${ev.id}.name`) }));
       if (zone.gearEff < 1) desc.push(t('expedition.gearEffNote', { pct: pct(zone.gearEff) }));
       if (exp.survivalChance < 0.2) desc.push(t('expedition.lowSurvival'));
+      if (zone.boss) desc.push(t('expedition.bossWarn', { chance: Math.round(BOSS.chance * 100), steal: Math.round(BOSS.stealPct * 100), max: fmt(BOSS.maxSteal) }));
       const embed = new EmbedBuilder().setColor(ev ? ev.color : 0x3498db)
         .setTitle(t('expedition.title', { emoji: zone.emoji, zone: t(`zone.${zone.id}.name`) }))
         .setDescription(desc.join('\n'))

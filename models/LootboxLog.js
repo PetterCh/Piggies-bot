@@ -7,7 +7,7 @@ const lootboxLogSchema = new mongoose.Schema(
     userId: { type: String, required: true, index: true },
     boxId: { type: String, required: true, index: true },
     price: { type: Number, required: true },
-    type: { type: String, required: true }, // nothing | coinks | gear | nft
+    type: { type: String, required: true }, // nothing | coinks | gear | set | nft
     rarity: { type: String, default: null },
     coinks: { type: Number, default: 0 },
     itemId: { type: String, default: null },

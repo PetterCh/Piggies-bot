@@ -24,22 +24,32 @@ for (const i of exclusive.list) {
 }
 
 /**
- * Zonas. Recompensa estrictamente proporcional: rewardMult = (minutos / 10) × dificultad.
- *   gearEff : eficacia del equipo NORMAL en la zona (el equipo exclusivo siempre rinde al 100%).
- *             En las zonas largas el equipo normal rinde cada vez menos, así que hace falta el equipo de la tienda rotativa.
+ * Zonas (rebalanceo v7.10). El multiplicador de Coinks ya NO sale de minutos × dificultad: se fija a mano para controlar la inflación.
+ *   baseSurvival : probabilidad base de volver con vida (el equipo la sube, tope MAX_SURVIVAL)
+ *   rewardMult   : multiplicador de Coinks de la zona
+ *   gearEff      : eficacia del equipo NORMAL en la zona (el equipo exclusivo siempre rinde al 100%)
+ *   maxSurvival  : techo de la probabilidad TOTAL de éxito (equipo + evento + perk revivir): zonas bajas 80-85%, así siempre hay riesgo
+ *   boss         : zona alta con jefe: si la expedición FRACASA puede robarte Coinks (ver BOSS)
  */
-const zone = (id, emoji, minutes, difficulty, baseSurvival, luck, gearEff, dropChance) => ({
-  id, emoji, minutes, durationMs: minutes * 60_000, difficulty, baseSurvival, luck, gearEff, dropChance,
-  rewardMult: Math.round((minutes / 10) * difficulty * 100) / 100,
+const zone = (id, emoji, minutes, baseSurvival, rewardMult, luck, gearEff, dropChance, boss = false, maxSurvival = 0.95) => ({
+  id, emoji, minutes, durationMs: minutes * 60_000, baseSurvival, rewardMult, luck, gearEff, dropChance, boss, maxSurvival,
 });
 const ZONES = {
-  bosque: zone('bosque', '🌲', 10, 1.0, 0.70, 1.0, 1.0, 0.30),
-  cueva:  zone('cueva',  '🕳️', 30, 1.15, 0.55, 1.2, 1.0, 0.32),
-  volcan: zone('volcan', '🌋', 60, 1.3, 0.40, 1.5, 0.9, 0.35),
-  ruinas: zone('ruinas', '🏛️', 240, 1.4, 0.25, 1.6, 0.7, 0.45),
-  abismo: zone('abismo', '🌀', 720, 1.6, 0.12, 1.8, 0.5, 0.60),
-  trono:  zone('trono',  '🐉', 1440, 1.8, 0.05, 2.0, 0.35, 0.80),
+  bosque: zone('bosque', '🌲', 10,   0.75, 1.0,  1.0, 1.0,  0.30, false, 0.85),
+  cueva:  zone('cueva',  '🕳️', 30,   0.60, 2.5,  1.2, 1.0,  0.32, false, 0.82),
+  volcan: zone('volcan', '🌋', 60,   0.45, 5.0,  1.5, 0.9,  0.35, false, 0.80),
+  ruinas: zone('ruinas', '🏛️', 240,  0.35, 15.0, 1.6, 0.7,  0.45, true),
+  abismo: zone('abismo', '🌀', 720,  0.25, 35.0, 1.8, 0.5,  0.60, true),
+  trono:  zone('trono',  '🐉', 1440, 0.15, 60.0, 2.0, 0.35, 0.80, true),
 };
+
+// Techo estricto de Coinks que puede dar UNA expedición, pase lo que pase (zona, equipo, evento, perks...).
+const MAX_COINKS_PER_EXPEDITION = 35_000;
+const MAX_SURVIVAL = 0.95; // techo global; cada zona puede tener uno más bajo (zone.maxSurvival)
+
+// Robo del jefe: solo en zonas altas (zone.boss). Si la expedición fracasa, `chance` de que el jefe le quite `stealPct` de los
+// Coinks que tenga en la cartera en ese momento, con un máximo de `maxSteal` por derrota. En zonas bajas fracasar solo da 0.
+const BOSS = { chance: 0.30, stealPct: 0.05, maxSteal: 10_000 };
 
 const DROP_SLOT_WEIGHTS = { weapon: 40, armor: 40, helmet: 20 };
 
@@ -100,11 +110,24 @@ function perksOf(equipped) {
   return { loot, revive: Math.min(revive, 0.5) };
 }
 
+/** Probabilidad de sobrevivir (equipo + evento), recortada al techo de la zona. */
+function survivalOf(zone, equipped, eventDef = null) {
+  const p = zone.baseSurvival + gearBonus(zone, equipped) + (eventDef?.survivalDelta || 0);
+  return Math.max(0.01, Math.min(MAX_SURVIVAL, zone.maxSurvival, p));
+}
+
+/** Probabilidad de "revivir" efectiva: se recorta para que éxito total (p + (1-p)·revive) no pase del techo de la zona. */
+function effectiveRevive(zone, p, revive) {
+  const room = Math.max(0, (Math.min(MAX_SURVIVAL, zone.maxSurvival) - p) / (1 - p));
+  return Math.min(revive, room);
+}
+
 module.exports = {
+  survivalOf, effectiveRevive,
   RARITIES, SLOTS, RARITY_INFO, ITEMS, ZONES,
   SELL_PRICE, FUSION, FUSION_CONSOLATION, CANCEL, DROP_SLOT_WEIGHTS,
   isNormal, itemsOf, requiredDistinct, rollItemOfType, rollItemId, gearBonus, perksOf,
   SHOP_PRICE: exclusive.SHOP_PRICE, SHOP_STOCK: exclusive.SHOP_STOCK, USES_BY_RARITY: exclusive.USES_BY_RARITY,
-  MAX_SURVIVAL: 0.95,
+  MAX_SURVIVAL, MAX_COINKS_PER_EXPEDITION, BOSS,
   ITEM_DROP_CHANCE: 0.3, // respaldo; cada zona define su propio dropChance
 };

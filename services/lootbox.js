@@ -14,7 +14,16 @@ const { BOXES } = require('../data/lootboxes');
 const config = require('../config');
 
 /** Sortea un premio de la tabla de la caja. `allowNft=false` excluye el premio NFT. */
+function rollSet(box) {
+  const slots = ['weapon', 'armor', 'helmet'];
+  const rar = slots.map(() => (Math.random() < box.legendaryChance ? 'legendary' : 'epic'));
+  if (!rar.includes('legendary')) rar[Math.floor(Math.random() * rar.length)] = 'legendary'; // pity: mínimo 1 legendaria
+  const itemIds = slots.map((slot, i) => pickRandom(Object.keys(ITEMS).filter((id) => ITEMS[id].source === 'shop' && ITEMS[id].type === slot && ITEMS[id].rarity === rar[i])));
+  return { type: 'set', rarity: 'legendary', itemIds, itemId: itemIds.join(',') };
+}
+
 function rollOutcome(box, { allowNft }) {
+  if (box.kind === 'set') return rollSet(box);
   const entries = box.table.filter((e) => e.type !== 'nft' || allowNft);
   let r = Math.random() * entries.reduce((a, e) => a + e.weight, 0);
   let entry = entries[entries.length - 1];
@@ -119,6 +128,7 @@ async function openBoxLocked(interaction, box, { again, ephemeral }) {
       if (!prize) outcome = rollOutcome(box, { allowNft: false }); // alguien se llevó el último justo antes
     }
     if (outcome.type === 'coinks') await addCoinks(userId, outcome.coinks, { type: 'lootbox_win', reason: box.id, guildId });
+    if (outcome.type === 'set') await User.updateOne({ discordId: userId }, { $push: { 'piggy.inventory': { $each: outcome.itemIds.map((itemId) => ({ itemId, usesLeft: ITEMS[itemId].maxUses })) } } });
     if (outcome.type === 'gear') await User.updateOne({ discordId: userId }, { $push: { 'piggy.inventory': { itemId: outcome.itemId } } });
     LootboxLog.create({ guildId, userId, boxId: box.id, price: box.price, type: outcome.type, rarity: outcome.rarity, coinks: outcome.coinks || 0, itemId: outcome.itemId || null, nftPrizeId: prize?._id || null })
       .catch((e) => console.error('[lootbox] log', e));
@@ -143,6 +153,10 @@ async function openBoxLocked(interaction, box, { again, ephemeral }) {
   if (outcome.type === 'gear') {
     const it = ITEMS[outcome.itemId];
     embed.setDescription(t('lootbox.result.gear', { item: t(`item.${outcome.itemId}`), rarity: rarityText, slot: t(`slot.${it.type}`), bonus: Math.round(it.bonus * 100) }));
+  }
+  if (outcome.type === 'set') {
+    const lines = outcome.itemIds.map((id) => `${RARITY_INFO[ITEMS[id].rarity].emoji} **${t(`item.${id}`)}** — ${t(`slot.${ITEMS[id].type}`)} +${Math.round(ITEMS[id].bonus * 100)}% · ${ITEMS[id].maxUses} ${t('lootbox.result.uses')}`);
+    embed.setDescription(t('lootbox.result.set', { items: lines.join('\n') }));
   }
   if (outcome.type === 'nft') {
     embed.setDescription(t('lootbox.result.nft', { name: prize.name })).addFields({ name: 'NFT', value: `**${prize.name}**${prize.description ? `\n${prize.description}` : ''}` });

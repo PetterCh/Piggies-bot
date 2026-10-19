@@ -36,6 +36,9 @@ async function announceWin(client, guild, { user, box, outcome, prize }) {
     const it = ITEMS[outcome.itemId];
     prizeName = t(L, `item.${outcome.itemId}`);
     desc = t(L, 'lootboxLog.gear', { user: `<@${user.id}>`, item: prizeName, rarity: rarityText, slot: t(L, `slot.${it.type}`), bonus: Math.round(it.bonus * 100) });
+  } else if (outcome.type === 'set') {
+    prizeName = outcome.itemIds.map((id) => t(L, `item.${id}`)).join(', ');
+    desc = t(L, 'lootboxLog.set', { user: `<@${user.id}>`, items: outcome.itemIds.map((id) => `${RARITY_INFO[ITEMS[id].rarity].emoji} **${t(L, `item.${id}`)}** (${t(L, `slot.${ITEMS[id].type}`)} +${Math.round(ITEMS[id].bonus * 100)}%)`).join('\n') });
   } else {
     prizeName = prize.name;
     desc = t(L, 'lootboxLog.nft', { user: `<@${user.id}>`, name: prize.name });

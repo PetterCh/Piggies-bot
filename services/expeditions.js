@@ -10,14 +10,14 @@ const { itemLabel } = require('../utils/itemText');
 const { withMedia } = require('../utils/media');
 const events = require('./events');
 const { EVENTS } = require('../data/events');
-const { RARITIES, RARITY_INFO, ITEMS, ZONES, SLOTS, MAX_SURVIVAL, CANCEL, rollItemId, gearBonus, perksOf } = require('../data/gameData');
+const { RARITIES, RARITY_INFO, ITEMS, ZONES, SLOTS, MAX_SURVIVAL, MAX_COINKS_PER_EXPEDITION, BOSS, CANCEL, rollItemId, gearBonus, perksOf, survivalOf, effectiveRevive } = require('../data/gameData');
 
 /** Suma "en bruto" de los bonus equipados (solo informativa; la real depende de la zona: ver gearBonus). */
 const equipmentBonus = (equipped) => SLOTS.reduce((sum, slot) => sum + (ITEMS[equipped?.[slot]]?.bonus || 0), 0);
 
 /** Probabilidad de sobrevivir en una zona: base + equipo (normal × eficacia de zona + exclusivo) + efecto del evento. */
 function computeSurvival(zone, equipped, eventDef = null) {
-  return Math.max(0.01, Math.min(MAX_SURVIVAL, zone.baseSurvival + gearBonus(zone, equipped) + (eventDef?.survivalDelta || 0)));
+  return survivalOf(zone, equipped, eventDef);
 }
 
 function rollRarity(luck) {
@@ -30,22 +30,46 @@ function rollRarity(luck) {
   return RARITIES[0];
 }
 
-/** Sortea el resultado. Coinks = rango de la rareza × rewardMult de la zona × evento × perk de botín. */
+/**
+ * Sortea el resultado.
+ * Coinks = rareza × multiplicador de la zona × (1 + bonus del equipo + bonus del evento), con los bonus SUMADOS (no en cadena),
+ * recortado al techo MAX_COINKS_PER_EXPEDITION. (La suerte de la zona solo cambia las probabilidades de rareza, no multiplica nada.)
+ * Si fracasa en una zona alta, el jefe puede emboscarlo (`ambush`): el robo se aplica a la cartera al resolver (ver resolveExpedition).
+ */
 function rollOutcome(zone, survivalChance, { perks, event }) {
   let survived = Math.random() < survivalChance;
   let revived = false;
-  if (!survived && perks.revive > 0 && Math.random() < perks.revive) { survived = true; revived = true; } // perk "revive"
-  if (!survived) return { survived: false, revived: false, coinks: 0, rarity: null, itemId: null, eventItemId: null };
+  const revive = effectiveRevive(zone, survivalChance, perks.revive); // el techo de la zona incluye el perk de revivir
+  if (!survived && revive > 0 && Math.random() < revive) { survived = true; revived = true; } // perk "revive"
+  if (!survived) return { survived: false, revived: false, coinks: 0, rarity: null, itemId: null, eventItemId: null, ambush: !!zone.boss && Math.random() < BOSS.chance };
 
   const rarity = rollRarity(zone.luck);
   const [min, max] = RARITY_INFO[rarity].coinks;
-  const coins = randInt(min, max) * zone.rewardMult * (event?.coinMult || 1) * (1 + perks.loot) * (revived ? 0.5 : 1);
+  const bonus = perks.loot + (event?.coinBonus || 0); // ADITIVO: +12% de equipo y +25% de evento = +37%, no x1.12 x1.25
+  const coins = randInt(min, max) * zone.rewardMult * (1 + bonus) * (revived ? 0.5 : 1);
   return {
-    survived: true, revived, rarity,
-    coinks: Math.max(1, Math.round(coins)),
+    survived: true, revived, rarity, ambush: false,
+    coinks: Math.min(MAX_COINKS_PER_EXPEDITION, Math.max(1, Math.round(coins))),
     itemId: Math.random() < zone.dropChance ? rollItemId(rarity) : null,
     eventItemId: event && Math.random() < event.dropChance ? pickRandom(event.items) : null,
   };
+}
+
+/** Cuánto roba el jefe ahora mismo: BOSS.stealPct de la cartera, máximo BOSS.maxSteal. Si el saldo cambia mientras tanto, reintenta. */
+const stealAmount = (balance) => Math.min(BOSS.maxSteal, Math.floor((balance || 0) * BOSS.stealPct));
+async function applyBossTheft(exp, zone) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const user = await User.findOne({ discordId: exp.discordId }).select('coinks').lean();
+    const amount = stealAmount(user?.coinks);
+    if (amount < 1) return 0;
+    try {
+      await removeCoinks(exp.discordId, amount, { type: 'expedition_boss', reason: `Boss: ${zone.id}`, guildId: exp.guildId });
+      return amount;
+    } catch (err) {
+      if (!(err instanceof InsufficientFundsError)) throw err; // gastó Coinks justo ahora: se recalcula con el saldo nuevo
+    }
+  }
+  return 0;
 }
 
 const getOpenExpedition = (discordId) => Expedition.findOne({ discordId, open: true });
@@ -76,6 +100,9 @@ async function resolveExpedition(expId) {
   const eq = exp.equipmentSnapshot;
   const event = exp.eventId ? EVENTS[exp.eventId] : null;
   const outcome = rollOutcome(zone, exp.survivalChance, { perks: perksOf(eq), event });
+  outcome.stolen = 0;
+  if (outcome.ambush) outcome.stolen = await applyBossTheft(exp, zone).catch((e) => { console.error('[expediciones] robo del jefe:', e.message); return 0; });
+  outcome.ambush = outcome.stolen > 0; // sin robo real (cartera casi vacía) no hay emboscada que contar
 
   // Desgaste: -1 uso a cada objeto exclusivo equipado (el equipo está bloqueado durante la expedición, así que sigue puesto).
   const user = await User.findOne({ discordId: exp.discordId });
@@ -112,7 +139,7 @@ async function resolveExpedition(expId) {
 
   await Expedition.updateOne(
     { _id: exp._id },
-    { status: 'completed', open: false, completedAt: new Date(), result: { survived: outcome.survived, revived: outcome.revived, coinks: outcome.coinks, rarity: outcome.rarity, droppedItem: outcome.itemId, eventItem: outcome.eventItemId, broken } }
+    { status: 'completed', open: false, completedAt: new Date(), result: { survived: outcome.survived, revived: outcome.revived, coinks: outcome.coinks, stolen: outcome.stolen, rarity: outcome.rarity, droppedItem: outcome.itemId, eventItem: outcome.eventItemId, broken } }
   );
   return { exp, outcome: { ...outcome, broken, usesLeft } };
 }
@@ -172,6 +199,9 @@ function buildResultEmbed(exp, outcome) {
 
   if (!outcome.survived) {
     embed.setColor(0xe74c3c).setDescription(`💀 ${tOr(L, [`expedition.death.${zone.id}`, 'expedition.death.default'])}`);
+    if (outcome.stolen > 0) {
+      embed.setColor(0x8e0000).addFields({ name: t(L, 'expedition.return.stolen'), value: `🪙 -${outcome.stolen.toLocaleString('en-US')}\n${t(L, `expedition.boss.${zone.id}`, { coins: outcome.stolen.toLocaleString('en-US') })}` });
+    }
     extras(embed);
     return { embed, ...withMedia(embed, [`expedition.die.${zone.id}`, 'expedition.die']) };
   }

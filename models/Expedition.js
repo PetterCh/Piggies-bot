@@ -18,7 +18,7 @@ const expeditionSchema = new mongoose.Schema(
     },
     eventId: { type: String, default: null }, // evento global activo cuando salió (sus efectos se fijan al salir)
     survivalChance: { type: Number, required: true },
-    result: { survived: Boolean, revived: Boolean, coinks: Number, rarity: String, droppedItem: String, eventItem: String, broken: [String] },
+    result: { survived: Boolean, revived: Boolean, coinks: Number, stolen: Number, rarity: String, droppedItem: String, eventItem: String, broken: [String] },
     completedAt: Date,
   },
   { timestamps: true }

@@ -10,11 +10,12 @@ const { fmt } = require('../utils/helpers');
 const config = require('../config');
 
 const NEEDED = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks];
-const STYLES = [ButtonStyle.Secondary, ButtonStyle.Primary, ButtonStyle.Success]; // un color por caja (en el orden de data/lootboxes.js)
+const STYLES = [ButtonStyle.Secondary, ButtonStyle.Primary, ButtonStyle.Success, ButtonStyle.Danger]; // un color por caja (en el orden de data/lootboxes.js)
 const pct = (n) => (n >= 10 ? Math.round(n) : n >= 1 ? n.toFixed(1) : n.toFixed(2)).toString();
 
 /** Resumen corto de una caja: % de nada / Coinks (rango) / accesorios (hasta qué rareza) / NFT. */
 function boxSummary(L, box) {
+  if (box.kind === 'set') return t(L, 'lootboxPanel.set', { pct: pct(box.legendaryChance * 100) });
   const total = box.table.reduce((a, e) => a + e.weight, 0);
   const share = (type) => box.table.filter((e) => e.type === type).reduce((a, e) => a + e.weight, 0) / total * 100;
   const coins = box.table.filter((e) => e.type === 'coinks');
@@ -40,7 +41,7 @@ function buildPanel(L, cfg) {
   if (cfg?.lootboxPanelImage) embed.setImage(cfg.lootboxPanelImage);
   else ({ files } = withMedia(embed, ['lootbox.panel']));
   const row = new ActionRowBuilder().addComponents(
-    ...Object.values(BOXES).map((box, i) => new ButtonBuilder().setCustomId(`lb:open:${box.id}`).setStyle(STYLES[i] || ButtonStyle.Secondary).setEmoji('📦')
+    ...Object.values(BOXES).map((box, i) => new ButtonBuilder().setCustomId(`lb:open:${box.id}`).setStyle(STYLES[i] || ButtonStyle.Secondary).setEmoji(box.emoji)
       .setLabel(t(L, 'lootboxPanel.btn', { price: fmt(box.price), currency: cur.name })))
   );
   return { embeds: [embed], components: [row], files };

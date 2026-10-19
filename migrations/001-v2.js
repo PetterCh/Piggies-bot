@@ -54,6 +54,28 @@ async function run() {
     if (err.codeName !== 'NamespaceNotFound' && err.code !== 26) throw err;
   }
 
+  // 1c) rebalanceo v7.10: los objetos exclusivos que ya tenían más usos de los nuevos máximos se recortan (p. ej. 11/11 -> 4/4).
+  try {
+    const { ITEMS, SLOTS } = require('../data/gameData');
+    const users = db.collection('users');
+    let clipped = 0;
+    for (const [id, it] of Object.entries(ITEMS)) {
+      if (!it.maxUses) continue;
+      const r1 = await users.updateMany(
+        { 'piggy.inventory': { $elemMatch: { itemId: id, usesLeft: { $gt: it.maxUses } } } },
+        { $set: { 'piggy.inventory.$[e].usesLeft': it.maxUses } },
+        { arrayFilters: [{ 'e.itemId': id, 'e.usesLeft': { $gt: it.maxUses } }] }
+      );
+      const slot = it.type;
+      if (!SLOTS.includes(slot)) continue;
+      const r2 = await users.updateMany({ [`piggy.equipped.${slot}`]: id, [`piggy.equippedUses.${slot}`]: { $gt: it.maxUses } }, { $set: { [`piggy.equippedUses.${slot}`]: it.maxUses } });
+      clipped += r1.modifiedCount + r2.modifiedCount;
+    }
+    if (clipped) console.log(`[migración] Rebalanceo: ${clipped} objetos exclusivos con usos recortados al nuevo máximo`);
+  } catch (err) {
+    console.error('[migración] recorte de usos:', err.message); // no es crítico: el bot funciona igual (solo muestra usos mayores al máximo)
+  }
+
   // 2) expediciones duplicadas
   const exps = db.collection('expeditions');
   const dups = await exps

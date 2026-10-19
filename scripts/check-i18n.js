@@ -64,6 +64,7 @@ Object.keys(BOXES).forEach((b) => { need(`lootbox.box.${b}`); need(`lootbox.boxD
 ['available', 'won', 'delivered'].forEach((s) => need(`lootboxAdmin.status.${s}`));
 ['orange', 'yellow', 'green', 'blue', 'purple'].forEach((c) => need(`colorgame.color.${c}`));
 ['nothing', 'coinks', 'gear', 'nft'].forEach((x) => need(`lootbox.odds.${x}`));
+['lootbox.result.set', 'lootbox.result.uses', 'lootboxPanel.set', 'lootboxLog.set'].forEach(need);
 
 // Eventos globales y rareza única
 need('rarity.event');

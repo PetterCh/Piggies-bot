@@ -54,6 +54,14 @@ const BOXES = {
       { type: 'nft', weight: 2 },
     ],
   },
+  // Caja MÍTICA (v7.12): un SET COMPLETO (arma + armadura + casco) de equipo exclusivo con usos. Cada pieza sale épica o legendaria
+  // (`legendaryChance` por pieza); si ninguna sale legendaria, una al azar se mejora (mínimo 1 legendaria asegurada).
+  // Cálculo (npm run lootbox:ev): valor medio ≈ 1.24 legendarias + 1.76 épicas ≈ 15,900 Coinks al precio de la tienda; usadas al máximo
+  // en el Trono rinden ≈ 19,600 en 4 expediciones → a 20,000 es break-even en el mejor caso y un gasto real en la práctica.
+  mitica: {
+    id: 'mitica', emoji: '💎', price: 20000, kind: 'set', legendaryChance: 0.30,
+    table: [],
+  },
 };
 
 module.exports = { BOXES };

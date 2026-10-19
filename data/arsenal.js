@@ -2,7 +2,7 @@
 // - Los objetos "legacy" son los de la v1/v2 y conservan EXACTAMENTE sus ids y bonus (los inventarios guardados los usan).
 // - Cada tipo tiene 10 objetos por rareza (armas y armaduras). Los 9 nuevos reparten su bonus dentro de la banda de la rareza.
 // - Para añadir un objeto: añade una fila [id, nombreES, nombreEN] a su grupo (id en ASCII, sin repetir).
-const BANDS = { common: [0.02, 0.04], uncommon: [0.05, 0.07], rare: [0.08, 0.12], epic: [0.13, 0.17], legendary: [0.20, 0.25] };
+const BANDS = { common: [0.02, 0.04], uncommon: [0.05, 0.07], rare: [0.08, 0.12], epic: [0.13, 0.17], legendary: [0.15, 0.20] };
 
 // [tipo, rareza, id, bonus, es, en]
 const LEGACY = [
@@ -10,12 +10,12 @@ const LEGACY = [
   ['weapon', 'uncommon', 'daga_de_trufa', 0.06, 'Daga de Trufa', 'Truffle Dagger'],
   ['weapon', 'rare', 'hacha_pezuna', 0.10, 'Hacha Pezuña', 'Hoof Axe'],
   ['weapon', 'epic', 'espada_de_jamon', 0.15, 'Espada de Jamón Curado', 'Cured Ham Sword'],
-  ['weapon', 'legendary', 'colmillo_jabali_rey', 0.22, 'Colmillo del Jabalí Rey', "Boar King's Tusk"],
+  ['weapon', 'legendary', 'colmillo_jabali_rey', 0.18, 'Colmillo del Jabalí Rey', "Boar King's Tusk"],
   ['armor', 'common', 'tapa_de_olla', 0.03, 'Tapa de Olla', 'Pot Lid'],
   ['armor', 'uncommon', 'chaleco_de_paja', 0.06, 'Chaleco de Paja', 'Straw Vest'],
   ['armor', 'rare', 'peto_de_barro', 0.10, 'Peto de Barro Cocido', 'Baked Clay Breastplate'],
   ['armor', 'epic', 'armadura_de_tocino', 0.15, 'Armadura de Tocino', 'Bacon Armor'],
-  ['armor', 'legendary', 'coraza_cerdo_dragon', 0.22, 'Coraza del Cerdo Dragón', 'Dragon Pig Cuirass'],
+  ['armor', 'legendary', 'coraza_cerdo_dragon', 0.18, 'Coraza del Cerdo Dragón', 'Dragon Pig Cuirass'],
   ['helmet', 'common', 'cacerola_con_orejas', 0.02, 'Cacerola con Orejas', 'Eared Saucepan'],
   ['helmet', 'uncommon', 'gorro_de_lana', 0.04, 'Gorro de Lana', 'Wool Cap'],
   ['helmet', 'rare', 'yelmo_de_hojalata', 0.07, 'Yelmo de Hojalata', 'Tin Helm'],

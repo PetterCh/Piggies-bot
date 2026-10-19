@@ -1,5 +1,22 @@
 # 🪙 Coinks Bot v7.4
 
+## Novedades v7.12 — 💎 Caja Mítica
+
+- Nueva caja de **20,000 Coinks** (10× la Legendaria) que entrega un **set completo**: arma + armadura + casco de equipo exclusivo **épico o legendario con usos** (los mismos objetos y usos que la tienda: 4). Cada pieza es legendaria con 30 %; si ninguna lo es, una se mejora (mínimo 1 🟡 asegurada). Media: 1.24 legendarias + 1.76 épicas.
+- **Balance** (cálculo con el modelo de `npm run expedition:ev`): al precio de la tienda el contenido vale ≈ 15,900; usado entero en el Trono (4 expediciones) rinde ≈ 19,600, así que a 20,000 es break-even en el mejor caso y un gasto neto en cualquier otra zona (Abismo ≈ 11,300). No crea ventaja nueva: es el equipo de siempre, sin el límite de stock de la tienda. Los usos finitos impiden acumular ventaja con dinero.
+- Aparece como 4.º botón del panel: vuelve a ejecutar `/lootbox-admin panel` para actualizar el mensaje. No hace falta `npm run deploy`. Se anuncia en el canal de logs como premio épico.
+
+## Novedades v7.11 — equipo rentable y techo de éxito en zonas bajas
+
+- **Techo de éxito por zona** (`zone.maxSurvival` en `data/gameData.js`): Bosque **85%**, Cueva **82%**, Volcán **80%**. Cuenta equipo + evento + perk de *revivir* (éste se recorta para no pasar del techo). Ruinas/Abismo/Trono siguen con el global 95%.
+- **Precios y durabilidad de la tienda** (`data/exclusive.js`): común 650 (2 usos), poco común 1,650 (3), raro 3,300 (4), épico 4,600 (**4**, antes 5), legendario 6,300 (4, antes 11,000).
+- **Calibración:** un set completo de tienda deja entre **+20% y +25% neto** sobre su coste por expedición en el **Trono**; en zonas más bajas sale negativo (se compra por seguridad, no por beneficio). Compruébalo con `npm run expedition:ev` (tabla "Rentabilidad").
+- Las rotaciones de tienda ya abiertas conservan el precio anterior hasta que roten. Al arrancar, la migración recorta los usos de objetos ya comprados al nuevo máximo.
+
+## Novedades v7.10 — rebalanceo de la economía
+
+Zonas, fórmula aditiva con techo de 35,000, eventos máx. +50%, equipo con menos usos y bonus, y robo del jefe en zonas altas: ver la sección *Zonas y recompensas*. No hace falta `npm run deploy`.
+
 ## Novedades v7.9
 
 1. **`/inventario` único:** sin subcomandos. Muestra directamente el panel con equipar, desequipar, vender y fusionar (botones y menús). Se eliminaron `equipar`, `desequipar`, `vender`, `fusionar` y `recetas`.
@@ -265,22 +282,24 @@ Todo es atómico sobre saldo e inventario (`services/inventory.js`); comandos y 
 
 `/expedicion cancelar` (con confirmación). Coste = `12 × multiplicador de recompensa × (0,4 + 0,6 × fracción de tiempo transcurrido)`, mínimo 5: **cuanto antes canceles, menos pagas**. El cerdito vuelve sin botín y sin gastar usos; luego puedes equipar y reenviar. Si la expedición termina en ese instante, se te devuelve el cobro. Ajustable en `CANCEL` (`data/gameData.js`).
 
-## Zonas, dificultad y recompensas
+## Zonas y recompensas (rebalanceo v7.10)
 
-Recompensa de Coinks = rango de la rareza × `rewardMult`, con `rewardMult = (minutos / 10) × dificultad`:
+Coinks de una expedición exitosa = rango de la rareza × `rewardMult` × (1 + bonus **sumados** de equipo y evento), recortado a **35,000** como máximo (`MAX_COINKS_PER_EXPEDITION` en `data/gameData.js`). La suerte de la zona solo cambia las probabilidades de rareza; no multiplica.
 
-| Zona | Duración | Dificultad | rewardMult | Superv. base | Eficacia equipo normal |
+| Zona | Duración | Éxito base | Multiplicador | Eficacia equipo normal | Jefe |
 |---|---|---|---|---|---|
-| Bosque Embarrado | 10 min | 1,0 | ×1 | 70% | 100% |
-| Cueva Oscura | 30 min | 1,15 | ×3,45 | 55% | 100% |
-| Volcán Jamonero | 1 h | 1,3 | ×7,8 | 40% | 90% |
-| Ruinas Malditas | 4 h | 1,4 | ×33,6 | 25% | 70% |
-| Abismo Eterno | 12 h | 1,6 | ×115,2 | 12% | 50% |
-| Trono del Dragón | 1 día | 1,8 | ×259,2 | 5% | 35% |
+| 🌲 Bosque Embarrado | 10 min | 75% | ×1,0 | 100% | — |
+| 🕳️ Cueva Oscura | 30 min | 60% | ×2,5 | 100% | — |
+| 🌋 Volcán Jamonero | 1 h | 45% | ×5,0 | 90% | — |
+| 🏛️ Ruinas Malditas | 4 h | 35% | ×15,0 | 70% | sí |
+| 🌀 Abismo Eterno | 12 h | 25% | ×35,0 | 50% | sí |
+| 🐉 Trono del Dragón | 1 día | 15% | ×60,0 | 35% | sí |
 
-El equipo **normal** rinde cada vez menos en las zonas largas (columna "eficacia") y el **exclusivo** siempre al 100%, así que con el mejor equipo normal tienes ~28% de volver del Trono y con el set legendario de la tienda ~85%. `npm run expedition:ev` imprime la tabla de supervivencias, EV de Coinks por expedición/hora, coste de cancelar y coste por uso de cada rareza para que lo balancees.
-
-> **Cambios que afectan al balance:** las zonas existentes (Cueva y Volcán) ahora pagan ×3,45 y ×7,8 (antes pagaban lo mismo que el Bosque). Las expediciones ya en curso al actualizar se resuelven con las reglas nuevas. Las zonas largas pagan mucho (la suerte de rareza sube con la dificultad, así que el reparto real crece algo más rápido que tiempo × dificultad): vigila la inflación con el libro contable y ajusta `difficulty`/`luck` en `ZONES`; con `luck: 1` el pago es estrictamente `tiempo × dificultad`.
+- **Robo del jefe:** en las 3 zonas altas, si la expedición **fracasa** (tras intentar el perk de revivir) hay un 30% de emboscada: el jefe se lleva el 5% de los Coinks de tu cartera en ese momento, máximo 10,000 por derrota. En zonas bajas fracasar solo da 0. Se avisa al enviar y el resultado muestra un mensaje por zona. Constantes en `BOSS` (`data/gameData.js`).
+- **Eventos:** ahora dan un bonus **aditivo** (`coinBonus`, máx. +50%): Tormenta de Sangre +50%, Lluvia de Estrellas +25%, Fiebre del Oro +50% (antes ×2), Niebla Espectral +15%.
+- **Equipo exclusivo:** usos máximos común 2, poco común 3, raro 4, épico 5, legendario 4, de evento 5 (antes 3/5/7/9/11/15). Bonus de supervivencia: legendarios +15–20% (antes hasta +32%), y el resto de rarezas escalado (ver `data/exclusive.js`); los legendarios normales también bajan a +15–20% y los objetos de evento a +15–20%. Los objetos que ya tenían más usos que el nuevo máximo se recortan solos al arrancar (migración).
+- **Cancelar:** el coste sigue siendo `12 × multiplicador × …`, así que baja con los nuevos multiplicadores (Trono: ~288 al inicio).
+- `npm run expedition:ev` imprime supervivencia, EV por expedición (con el techo), pérdida esperada por el jefe y coste por uso del equipo.
 
 ## Tienda en un canal (estilo Drip)
 

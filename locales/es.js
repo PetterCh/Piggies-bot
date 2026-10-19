@@ -141,6 +141,7 @@ module.exports = {
   expedition: {
     eventBanner: "{emoji} Evento activo: **{name}** (se aplica a esta expedición)",
     gearEffNote: "⚠️ En esta zona tu equipo **normal** rinde solo al {pct}%; el equipo **exclusivo** de la tienda rotativa rinde al 100%.",
+    bossWarn: "☠️ Zona con jefe: si la expedición fracasa, hay un {chance}% de que te emboscen y te roben el {steal}% de tus Coinks en cartera (máx. {max}).",
     lowSurvival: "💀 Zona MUY peligrosa: tu probabilidad de volver es baja. Considera equipo de la Tienda de Expedición o cancela con `/expedicion cancelar`.",
     fReward: "Multiplicador de recompensa",
     fDuration: "Duración",
@@ -168,7 +169,13 @@ module.exports = {
       item: "Equipo encontrado",
       broken: "Equipo roto",
       uses: "Usos restantes",
+      stolen: "Robado por el jefe",
       eventItem: "¡Objeto único de evento!",
+    },
+    boss: {
+      ruinas: ["¡El Guardián de las Ruinas emboscó a tu cerdito y le arrebató **{coins}** Coinks de su bolsa!", "Una maldición antigua se despertó: el Guardián de las Ruinas le vació **{coins}** Coinks del bolsillo."],
+      abismo: ["¡El Leviatán del Abismo emboscó a tu cerdito y le arrebató **{coins}** Coinks de su bolsa!", "Algo enorme salió de la oscuridad y se zampó **{coins}** Coinks de tu cerdito. Ni las gracias dio."],
+      trono: ["¡El Dragón emboscó a tu cerdito y le arrebató **{coins}** Coinks de su bolsa!", "El Rey Dragón se rió, soltó una llamarada y se quedó con **{coins}** Coinks de tu cerdito. Su tesoro crece."],
     },
     death: {
       bosque: [
@@ -424,6 +431,7 @@ module.exports = {
     coinks: "🪙 Coinks **{pct}%** ({min}–{max})",
     gear: "🎒 Accesorios **{pct}%** (hasta {best} {bestPct}%)",
     nft: "🏆 NFT **{pct}%**",
+    set: "⚔️🛡️⛑️ Set completo **100%**: 3 objetos 🟣/🟡 con usos · 🟡 por pieza **{pct}%** (mín. 1 🟡 asegurada)",
     btn: "Caja {price} {currency}",
     published: "✅ Panel de cajas publicado: {url}",
     removed: "✅ Panel de cajas eliminado.",
@@ -442,11 +450,12 @@ module.exports = {
     again: "Abrir otra ({price})",
     busy: "⏳ Ya estás abriendo una caja, espera un momento.",
     notYours: "❌ Ese botón es de otra persona. Abre tu propia caja desde el panel de cajas.",
-    box: { basica: "Caja Básica", premium: "Caja Premium", legendaria: "Caja Legendaria" },
+    box: { basica: "Caja Básica", premium: "Caja Premium", legendaria: "Caja Legendaria", mitica: "Caja Mítica" },
     boxDesc: {
       basica: "Para empezar. Bastantes posibilidades de que salga poco… y alguna de que salga mucho.",
       premium: "Mejores accesorios y premios gordos de Coinks.",
       legendaria: "Las mejores opciones de accesorios legendarios, Coinks enormes y NFTs reales.",
+      mitica: "Un set completo (arma, armadura y casco) épico/legendario con usos. Siempre al menos una pieza legendaria.",
     },
     odds: {
       nothing: "❌ Nada — **{pct}%**",
@@ -466,6 +475,8 @@ module.exports = {
     result: {
       coinks: "💰 La caja escupió **{coinks}** Coinks ({rarity}).",
       gear: "🎒 ¡Dentro había **{item}** ({rarity})! {slot} con +{bonus}% de supervivencia. Ya está en la mochila de tu cerdito (`/inventario`).",
+      uses: "usos",
+      set: "💎 ¡La Caja Mítica soltó un **set completo**! Ya está en la mochila de tu cerdito (`/inventario`):\n{items}",
       nft: "🏆 ¡¡¡INCREÍBLE!!! ¡Te llevaste el NFT **{name}**! Un admin te lo enviará a tu wallet vinculada.",
       nothing: [
         "📦 Vacía. Completamente vacía. Hasta el cerdito la miró con lástima.",
@@ -534,6 +545,7 @@ module.exports = {
     coinks: "{user} sacó **{coinks}** Coinks ({rarity}).",
     gear: "{user} sacó **{item}** ({rarity}) — {slot} con +{bonus}% de supervivencia.",
     nft: "🏆 {user} se llevó el NFT **{name}**.",
+    set: "💎 {user} abrió una Caja Mítica y salió un set completo:\n{items}",
     hypeEpic: [
       "🚨 ¡{user} acaba de sacar **{prize}** de una caja! ¡Premio ÉPICO!",
       "🔥 ¡Hype! {user} abrió una caja y salió **{prize}**.",
@@ -646,7 +658,7 @@ module.exports = {
     choice: "{emoji} {name}",
     endsAt: "Termina {when}.",
     items: "Objetos únicos que pueden caer",
-    effects: "Supervivencia **{survival}** · Coinks **x{coins}** · **{chance}%** de soltar un objeto único en cada expedición exitosa",
+    effects: "Supervivencia **{survival}** · Coinks **+{coins}%** · **{chance}%** de soltar un objeto único en cada expedición exitosa",
     startTitle: "{emoji} ¡{name}!",
     prizeTitle: "{emoji} ¡Premio de {name}!",
     prizeLine: "🎉 ¡{user} consiguió **{item}**!",
@@ -672,10 +684,10 @@ module.exports = {
     },
     fiebre_del_oro: {
       name: "Fiebre del Oro",
-      desc: "Se descubrió una veta de oro: las recompensas en Coinks se duplican y caen objetos dorados únicos.",
+      desc: "Se descubrió una veta de oro: las recompensas en Coinks suben un 50% y caen objetos dorados únicos.",
       start: [
-        "💰 ¡Veta de oro descubierta! Durante la **Fiebre del Oro** todo el botín en Coinks se **duplica** y pueden caer **objetos dorados** únicos. ¡A picar!",
-        "💰 Los cerditos huelen oro en el aire. ¡**Fiebre del Oro** activada! Las expediciones pagan el doble.",
+        "💰 ¡Veta de oro descubierta! Durante la **Fiebre del Oro** el botín en Coinks sube un **50%** y pueden caer **objetos dorados** únicos. ¡A picar!",
+        "💰 Los cerditos huelen oro en el aire. ¡**Fiebre del Oro** activada! Las expediciones pagan un 50% más.",
       ],
       end: "La Fiebre del Oro se acabó: la veta se agotó. Hora de gastar lo ganado.",
       prize: ["💰 ¡{user} encontró **{item}** entre pepitas de oro!", "💰 ¡La fortuna sonríe a {user}: **{item}**!"],

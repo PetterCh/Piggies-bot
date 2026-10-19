@@ -2,6 +2,7 @@
 const { BOXES } = require('../data/lootboxes');
 
 for (const box of Object.values(BOXES)) {
+  if (box.kind === 'set') { console.log(`\n${box.emoji} ${box.id} — precio ${box.price}: set completo épico/legendario con usos (mín. 1 legendaria; ${box.legendaryChance * 100}% por pieza). Ver el cálculo en npm run expedition:ev y en data/lootboxes.js`); continue; }
   const total = box.table.reduce((a, e) => a + e.weight, 0);
   let ev = 0;
   console.log(`\n${box.emoji} ${box.id} — precio ${box.price}`);
