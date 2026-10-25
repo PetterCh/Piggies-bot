@@ -49,7 +49,7 @@ const MAX_SURVIVAL = 0.90; // techo global; cada zona puede tener uno más bajo 
 
 // Robo del jefe: solo en zonas altas (zone.boss). Si la expedición fracasa, `chance` de que el jefe le quite `stealPct` de los
 // Coinks que tenga en la cartera en ese momento, con un máximo de `maxSteal` por derrota. En zonas bajas fracasar solo da 0.
-const BOSS = { chance: 0.30, stealPct: 0.05, maxSteal: 10_000 };
+const BOSS = { chance: 0.30, stealPct: 0.05, maxSteal: 15_000 };
 
 const DROP_SLOT_WEIGHTS = { weapon: 40, armor: 40, helmet: 20 };
 
