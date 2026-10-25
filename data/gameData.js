@@ -44,8 +44,8 @@ const ZONES = {
 };
 
 // Techo estricto de Coinks que puede dar UNA expedición, pase lo que pase (zona, equipo, evento, perks...).
-const MAX_COINKS_PER_EXPEDITION = 35_000;
-const MAX_SURVIVAL = 0.95; // techo global; cada zona puede tener uno más bajo (zone.maxSurvival)
+const MAX_COINKS_PER_EXPEDITION = 100_000;
+const MAX_SURVIVAL = 0.90; // techo global; cada zona puede tener uno más bajo (zone.maxSurvival)
 
 // Robo del jefe: solo en zonas altas (zone.boss). Si la expedición fracasa, `chance` de que el jefe le quite `stealPct` de los
 // Coinks que tenga en la cartera en ese momento, con un máximo de `maxSteal` por derrota. En zonas bajas fracasar solo da 0.
