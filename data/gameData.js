@@ -35,12 +35,12 @@ const zone = (id, emoji, minutes, baseSurvival, rewardMult, luck, gearEff, dropC
   id, emoji, minutes, durationMs: minutes * 60_000, baseSurvival, rewardMult, luck, gearEff, dropChance, boss, maxSurvival,
 });
 const ZONES = {
-  bosque: zone('bosque', '🌲', 10,   0.75, 1.0,  1.0, 1.0,  0.30, false, 0.85),
-  cueva:  zone('cueva',  '🕳️', 30,   0.60, 2.5,  1.2, 1.0,  0.32, false, 0.82),
-  volcan: zone('volcan', '🌋', 60,   0.45, 5.0,  1.5, 0.9,  0.35, false, 0.80),
-  ruinas: zone('ruinas', '🏛️', 240,  0.35, 15.0, 1.6, 0.7,  0.45, true),
-  abismo: zone('abismo', '🌀', 720,  0.25, 35.0, 1.8, 0.5,  0.60, true),
-  trono:  zone('trono',  '🐉', 1440, 0.15, 60.0, 2.0, 0.35, 0.80, true),
+  bosque: zone('bosque', '🌲', 10,   0.75, 1.1,  1.0, 1.0,  0.30, false, 0.85),
+  cueva:  zone('cueva',  '🕳️', 30,   0.60, 5,  1.2, 1.0,  0.32, false, 0.82),
+  volcan: zone('volcan', '🌋', 60,   0.45, 10.0,  1.5, 0.9,  0.35, false, 0.80),
+  ruinas: zone('ruinas', '🏛️', 240,  0.35, 20.0, 1.6, 0.7,  0.45, true),
+  abismo: zone('abismo', '🌀', 720,  0.25, 45.0, 1.8, 0.5,  0.60, true),
+  trono:  zone('trono',  '🐉', 1440, 0.15, 90.0, 2.0, 0.35, 0.80, true),
 };
 
 // Techo estricto de Coinks que puede dar UNA expedición, pase lo que pase (zona, equipo, evento, perks...).
