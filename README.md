@@ -1,5 +1,14 @@
 # 🪙 Coinks Bot v7.4
 
+## Novedades v7.13 — 🕹️ Web interactiva de Piggies (módulo independiente)
+
+- **`/play/<id>`** (`routes/webview.js`): lee `public/piggies/metadata/<id>.json` y devuelve una página ligera con `<canvas>`: animación IDLE (frames 1–4), caminar con **WASD / flechas** (frames 5–12, botones táctiles en móvil) y botón **Comer** (frames 13–16; también tecla E). Hoja de 4×4 frames de 91×100 (`public/piggies/sprite-config.json`).
+- **Assets estáticos** en `public/piggies/` → `metadata/` y `sprites/` (se sirven en `/piggies/metadata/150.json` y `/piggies/sprites/150.png`). Detalles de la hoja de sprites, `sprite-config.json` y uso de Volume en `public/piggies/README.md`.
+- **`/p <id>`** (`commands/games/p.js`): embed con nombre, descripción, atributos y vista previa + botón de enlace «🕹️ Jugar con Piggie #150». **Requiere `npm run deploy`** (comando nuevo).
+- **Independiente:** no usa MongoDB ni toca expediciones, tienda ni inventario. Lo único añadido al bot es un bloque `try/catch` en `index.js` que arranca el servidor (`web/server.js`); si falla, el bot sigue igual.
+- **Configuración (Railway):** genera un dominio en *Settings → Networking*; el bot usa `PORT` y `RAILWAY_PUBLIC_DOMAIN` solos. Con dominio propio define `PUBLIC_URL`. Opcionales: `WEB_ENABLED=off`, `PIGGIES_DIR`.
+- Dependencia nueva: `express` (ejecuta `npm install`; Railway lo hace al desplegar).
+
 ## Novedades v7.12 — 💎 Caja Mítica
 
 - Nueva caja de **20,000 Coinks** (10× la Legendaria) que entrega un **set completo**: arma + armadura + casco de equipo exclusivo **épico o legendario con usos** (los mismos objetos y usos que la tienda: 4). Cada pieza es legendaria con 30 %; si ninguna lo es, una se mejora (mínimo 1 🟡 asegurada). Media: 1.24 legendarias + 1.76 épicas.

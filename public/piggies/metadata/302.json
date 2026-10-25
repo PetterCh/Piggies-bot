@@ -1,0 +1,31 @@
+{
+  "name": "Baby Piggies #302",
+  "description": "Baby Piggies 🐷 999\n\nA vibrant pixel art universe where tiny, adorable baby piggies rule the blockchain!\n\nWhile the majority of the collection features unique, charming little piggies equipped with all kinds of outfits and expressions, a few legendary 1/1 masterworks stand as rare mythical bosses of the realm.\n\nHand-crafted pixel by pixel. Collect them, trade them, and join the litter.",
+  "image": "302.png",
+  "attributes": [
+    {
+      "trait_type": "background",
+      "value": "bubbleplum"
+    },
+    {
+      "trait_type": "fur",
+      "value": "caramel"
+    },
+    {
+      "trait_type": "eyes",
+      "value": "weirdo"
+    },
+    {
+      "trait_type": "onesie",
+      "value": "froggy king"
+    },
+    {
+      "trait_type": "mouth",
+      "value": "blank"
+    },
+    {
+      "trait_type": "hands",
+      "value": "blank"
+    }
+  ]
+}

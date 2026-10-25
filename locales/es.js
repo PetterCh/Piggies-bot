@@ -423,6 +423,13 @@ module.exports = {
   },
 
   // ---------------- LOOTBOXES ----------------
+  piggyWeb: {
+    notFound: "❌ No encontré el Piggie **#{id}**. Revisa el número.",
+    noWeb: "⚠️ La web de Piggies no está configurada todavía (falta la URL pública del servicio). Avisa a un admin.",
+    noDesc: "Un Piggie listo para jugar.",
+    footer: "Piggie #{id}",
+    play: "🕹️ Jugar con Piggie #{id}",
+  },
   lootboxPanel: {
     title: "🎁 Cajas misteriosas",
     desc: "Elige una caja, paga con Coinks y descubre tu premio. El resultado lo ves solo tú.",

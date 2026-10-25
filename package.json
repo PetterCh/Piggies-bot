@@ -1,6 +1,6 @@
 {
   "name": "coinks-bot",
-  "version": "7.12.0",
+  "version": "7.13.1",
   "description": "Bot de Discord: NFTs, economía Coinks y minijuegos",
   "main": "index.js",
   "scripts": {
@@ -20,6 +20,7 @@
     "discord.js": "^14.17.0",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.0",
+    "express": "^4.21.2",
     "mongoose": "^8.5.0",
     "node-cron": "^3.0.3"
   }

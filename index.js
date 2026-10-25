@@ -30,6 +30,9 @@ for (const file of walk(path.join(__dirname, 'events'))) {
   client[event.once ? 'once' : 'on'](event.name, (...args) => event.execute(...args, client));
 }
 
+// Módulo web de Piggies (independiente: /play/:id + assets estáticos). Si falla, el bot sigue funcionando igual.
+try { require('./web/server').startWebServer(); } catch (err) { console.error('[web] no se pudo iniciar:', err.message); }
+
 process.on('unhandledRejection', (err) => console.error('[unhandledRejection]', err));
 
 async function shutdown(signal) {

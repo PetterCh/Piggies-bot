@@ -416,6 +416,13 @@ module.exports = {
     cancelled: "✅ Giveaway cancelled and entries refunded.",
   },
 
+  piggyWeb: {
+    notFound: "❌ I couldn't find Piggie **#{id}**. Check the number.",
+    noWeb: "⚠️ The Piggies web isn't configured yet (the service's public URL is missing). Let an admin know.",
+    noDesc: "A Piggie ready to play.",
+    footer: "Piggie #{id}",
+    play: "🕹️ Play with Piggie #{id}",
+  },
   lootboxPanel: {
     title: "🎁 Mystery boxes",
     desc: "Pick a box, pay with Coinks and discover your prize. Only you see the result.",

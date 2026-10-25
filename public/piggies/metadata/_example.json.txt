@@ -1,0 +1,7 @@
+{
+  "name": "Piggie #150",
+  "description": "Descripción opcional.",
+  "image": "https://ejemplo.com/150.png",
+  "attributes": [{ "trait_type": "Hat", "value": "Cap" }],
+  "sprite": { "scale": 2 }
+}

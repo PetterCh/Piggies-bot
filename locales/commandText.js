@@ -35,6 +35,8 @@ const names = {
 
 // descripción en español (tal como está en el código) -> inglés
 const descriptions = {
+  'Mira un Piggie y juega con él en la web': 'View a Piggie and play with it on the web',
+  'ID del Piggie (ej. 150)': 'Piggie ID (e.g. 150)',
   '(Admin) Liga de Ballenas: panel, exclusiones y roles por puesto': '(Admin) Whale League: panel, exclusions and rank roles',
   'Publica o actualiza el panel del leaderboard': 'Post or update the leaderboard panel',
   'Oculta a una cuenta del leaderboard (admins, bots, tú…)': 'Hide an account from the leaderboard (admins, bots, you…)',
