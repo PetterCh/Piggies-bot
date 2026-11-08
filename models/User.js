@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema(
   {
     discordId: { type: String, required: true, unique: true },
     coinks: { type: Number, default: 0, min: 0 },
+    // Solo para el leaderboard: Coinks GANADOS este mes (se pone a 0 el día 1). No es saldo: gastarlo o perderlo no lo cambia.
+    monthlyCoinks: { type: Number, default: 0, min: 0 },
     lang: { type: String, enum: ['es', 'en'], default: null }, // preferencia manual; null = detección automática
     piggy: {
       name: { type: String, default: 'Cerdito' },

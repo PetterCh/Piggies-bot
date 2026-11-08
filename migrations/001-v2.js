@@ -94,4 +94,4 @@ async function run() {
   }
 }
 
-module.exports = { run };
+module.exports = { run: async () => { await run(); await require('./002-monthly').run().catch((e) => console.error('[migración] 002:', e.message)); } };

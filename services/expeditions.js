@@ -128,6 +128,7 @@ async function resolveExpedition(expId) {
   if (Object.keys(set).length) update.$set = set;
   if (outcome.survived) {
     update.$inc.coinks = outcome.coinks;
+    update.$inc.monthlyCoinks = outcome.coinks; // contador del leaderboard mensual (no es saldo)
     update.$inc['piggy.stats.totalLoot'] = outcome.coinks;
     const drops = [];
     if (outcome.itemId) drops.push({ itemId: outcome.itemId });

@@ -1,7 +1,8 @@
-// "Liga de Ballenas del Chiquero": Top 10 por Coinks (desempate: expediciones), exclusiones y temporadas mensuales (rol Top 3).
+// "Liga de Ballenas del Chiquero": Top 10 por Coinks GANADOS EN EL MES (User.monthlyCoinks; desempate: expediciones), exclusiones y temporadas mensuales (rol Top 3).
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const User = require('../models/User');
 const GuildConfig = require('../models/GuildConfig');
+const BotMeta = require('../models/BotMeta');
 const LootboxLog = require('../models/LootboxLog');
 const Expedition = require('../models/Expedition');
 const config = require('../config');
@@ -34,9 +35,9 @@ async function computeTop(guild, cfg, limit = config.leaderboard.size) {
   const skipIds = excludedIds(cfg);
   const out = [];
   for (let b = 0; b < MAX_BATCHES && out.length < limit; b++) {
-    const docs = await User.find({ discordId: { $nin: skipIds } })
-      .sort({ coinks: -1, 'piggy.stats.expeditions': -1, _id: 1 }).skip(b * BATCH).limit(BATCH)
-      .select('discordId coinks piggy.stats.expeditions').lean();
+    const docs = await User.find({ discordId: { $nin: skipIds }, monthlyCoinks: { $gt: 0 } })
+      .sort({ monthlyCoinks: -1, 'piggy.stats.expeditions': -1, _id: 1 }).skip(b * BATCH).limit(BATCH)
+      .select('discordId monthlyCoinks piggy.stats.expeditions').lean();
     if (!docs.length) break;
     const ids = docs.map((d) => d.discordId);
     let members = guild.members.cache;
@@ -45,7 +46,7 @@ async function computeTop(guild, cfg, limit = config.leaderboard.size) {
     for (const d of docs) {
       const m = members.get(d.discordId);
       if (!m || m.user.bot) continue;
-      out.push({ id: d.discordId, coinks: d.coinks || 0, exp: d.piggy?.stats?.expeditions || 0 });
+      out.push({ id: d.discordId, coinks: d.monthlyCoinks || 0, exp: d.piggy?.stats?.expeditions || 0 });
       if (out.length >= limit) break;
     }
   }
@@ -279,22 +280,22 @@ async function refreshAll(client) {
 
 /** Puesto de un usuario: exacto si está en el Top 100, aproximado (conteo en BD) si no. null = sin cuenta. */
 async function myRank(guild, cfg, userId) {
-  const doc = await User.findOne({ discordId: userId }).select('coinks piggy.stats.expeditions').lean();
+  const doc = await User.findOne({ discordId: userId }).select('monthlyCoinks piggy.stats.expeditions').lean();
   if (!doc) return { none: true };
   if (excludedIds(cfg).includes(userId)) return { excluded: true };
-  const coinks = doc.coinks || 0;
+  const coinks = doc.monthlyCoinks || 0;
   const exp = doc.piggy?.stats?.expeditions || 0;
   const top = await computeTop(guild, cfg, 100);
   const idx = top.findIndex((p) => p.id === userId);
   if (idx >= 0) return { rank: idx + 1, coinks, exp, approx: false };
-  const ahead = await User.countDocuments({ coinks: { $gt: coinks }, discordId: { $nin: excludedIds(cfg) } });
+  const ahead = await User.countDocuments({ monthlyCoinks: { $gt: coinks }, discordId: { $nin: excludedIds(cfg) } });
   return { rank: ahead + 1, coinks, exp, approx: true };
 }
 
 /**
  * Cierra la temporada: entrega el rol a los 3 primeros, se lo quita a quien bajó y lo anuncia.
  * `season` = clave del mes que termina. `manual` = lanzado por un admin (no toca lbLastSeason).
- * Los Coinks NO se reinician: el rol es el premio del mes, la tabla es acumulada.
+ * El contador mensual se pone a 0 en closeDue (después de cerrar todos los servidores); el saldo real (`coinks`) nunca se toca.
  */
 async function closeSeason(client, guildId, { season, manual = false } = {}) {
   const cfg = await getGuildConfig(guildId);
@@ -333,6 +334,20 @@ async function closeSeason(client, guildId, { season, manual = false } = {}) {
   return res;
 }
 
+/**
+ * Reinicio mensual del contador del leaderboard: SOLO `monthlyCoinks` -> 0. Se hace una vez por mes (marca BotMeta 'lbMonth') y siempre
+ * DESPUÉS de cerrar la temporada, para no borrar los datos de los ganadores antes de anunciarlos. Devuelve cuántos usuarios se reiniciaron.
+ */
+async function rollMonthCounters() {
+  const key = seasonKey();
+  const meta = await BotMeta.findById('lbMonth').lean();
+  if (meta?.value === key) return 0;
+  let n = 0;
+  if (meta) n = (await User.updateMany({ monthlyCoinks: { $gt: 0 } }, { $set: { monthlyCoinks: 0 } })).modifiedCount; // nunca toca `coinks`
+  await BotMeta.updateOne({ _id: 'lbMonth' }, { $set: { value: key } }, { upsert: true });
+  return n;
+}
+
 /** Cierra el mes anterior en los servidores a los que les toca (también recupera cierres perdidos si el bot estuvo apagado). */
 async function closeDue(client) {
   const prev = seasonKey(new Date(), 1);
@@ -344,6 +359,10 @@ async function closeDue(client) {
       console.log(`[leaderboard] ${cfg.guildId}: temporada ${prev} cerrada (${r.winners.length} ganadores)`);
     } catch (e) { console.error('[leaderboard] cierre:', e); }
   }
+  try {
+    const n = await rollMonthCounters();
+    if (n) console.log(`[leaderboard] contador mensual reiniciado (${n} usuarios; los saldos no se tocan)`);
+  } catch (e) { console.error('[leaderboard] reinicio mensual:', e); }
 }
 
-module.exports = { renderPanel, applyRoles, roleMap, hasRoles, roleLines, RANK_KEYS, getProfiles, luckScore, streakFrom, metricLines, computeTop, buildPanel, publishPanel, removePanel, refreshAll, myRank, closeSeason, closeDue, seasonKey, excludedIds, NEEDED };
+module.exports = { renderPanel, applyRoles, roleMap, hasRoles, roleLines, RANK_KEYS, getProfiles, luckScore, streakFrom, metricLines, computeTop, buildPanel, publishPanel, removePanel, refreshAll, myRank, closeSeason, closeDue, rollMonthCounters, seasonKey, excludedIds, NEEDED };

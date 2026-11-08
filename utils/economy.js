@@ -38,7 +38,10 @@ async function upsertUser(discordId, update) {
 const getUser = (discordId) => upsertUser(discordId, {});
 
 // --- Primitivas sin registro contable (las usan las funciones públicas) ---
-const _credit = (discordId, amount) => upsertUser(discordId, { $inc: { coinks: amount } });
+const _credit = (discordId, amount, { earned = false } = {}) => upsertUser(discordId, { $inc: earned ? { coinks: amount, monthlyCoinks: amount } : { coinks: amount } });
+
+// Qué abonos cuentan como "ganados" para el leaderboard mensual: no los reembolsos ni los regalos de admin (transferencias y airdrops no pasan por addCoinks).
+const countsAsEarned = (type) => !/refund/.test(type || '') && type !== 'admin_give';
 
 async function _debit(discordId, amount) {
   // El filtro `coinks >= amount` hace la comprobación de saldo y el descuento en UNA sola operación.
@@ -54,7 +57,7 @@ async function _debit(discordId, amount) {
 /** Suma Coinks a un usuario. meta: { type, reason, guildId, byId } */
 async function addCoinks(discordId, amount, meta = {}) {
   assertAmount(amount);
-  const user = await _credit(discordId, amount);
+  const user = await _credit(discordId, amount, { earned: countsAsEarned(meta.type) });
   logLedger({ type: meta.type || 'credit', toId: discordId, byId: meta.byId || null, amount, reason: meta.reason || '', guildId: meta.guildId || null });
   return user;
 }

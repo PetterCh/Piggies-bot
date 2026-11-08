@@ -6,7 +6,8 @@
 // Usos máximos (rebalanceo v7.10): comunes 2, poco comunes 3, raros 4, épicos 4 (v7.11), legendarios 4, de evento 5.
 const USES_BY_RARITY = { common: 2, uncommon: 3, rare: 4, epic: 4, legendary: 4, event: 5 }; // v7.11: épico 5 → 4
 const SHOP_PRICE = { common: 650, uncommon: 1650, rare: 3300, epic: 4600, legendary: 6300 }; // Coinks
-const SHOP_STOCK = { common: 8, uncommon: 6, rare: 4, epic: 2, legendary: 1 }; // unidades por rotación y servidor
+// Unidades por objeto, rotación y servidor. Desde v7.14 la tienda rotativa solo vende épicos y legendarios (el resto de entradas ya no se usa).
+const SHOP_STOCK = { common: 8, uncommon: 6, rare: 4, epic: 1, legendary: 1 };
 
 // [tipo, rareza, id, bonus, es, en, perk?]
 const SHOP = [

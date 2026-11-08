@@ -1,4 +1,4 @@
-// Tienda de Expedición rotativa: ~10 objetos exclusivos con stock limitado. Común/poco común/raro rotan cada 12 h; épico/legendario cada 24 h.
+// Tienda de Expedición rotativa (v7.14): SOLO objetos épicos y legendarios, con stock muy limitado. Épicos cada 12 h; legendarios cada 24 h.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const ExpShopRotation = require('../models/ExpShopRotation');
 const GuildConfig = require('../models/GuildConfig');
@@ -14,13 +14,16 @@ const { logPurchase } = require('./purchaseLog');
 const { shuffle, sleep, fmt } = require('../utils/helpers');
 const config = require('../config');
 
-// Dos niveles con frecuencias INDEPENDIENTES (config.expShop): el escaparate completo son 10 objetos (7 + 3).
-//   fast: común, poco común y raro  -> cada 12 h (2 veces al día)
-//   slow: épico y legendario        -> cada 24 h (1 vez al día)
+// Dos niveles con frecuencias INDEPENDIENTES (config.expShop): el escaparate completo son 5 objetos. Composición = [rareza, cuántos objetos DISTINTOS].
+// El stock de cada objeto (1 unidad por servidor y rotación) está en SHOP_STOCK (data/exclusive.js). Los nombres de nivel (fast/slow) se
+// conservan por compatibilidad con la base de datos: ahora fast = ÉPICOS y slow = LEGENDARIOS.
+//   fast: 3 épicos       -> cada 12 h (6 épicos al día, 3 distintos por rotación)
+//   slow: 2 legendarios  -> cada 24 h
 const TIERS = {
-  fast: { ms: config.expShop.rotationHours * 3600_000, composition: [['common', 2], ['uncommon', 2], ['rare', 3]] },
-  slow: { ms: config.expShop.slowRotationHours * 3600_000, composition: [['epic', 2], ['legendary', 1]] },
+  fast: { ms: config.expShop.rotationHours * 3600_000, composition: [['epic', 3]] },
+  slow: { ms: config.expShop.slowRotationHours * 3600_000, composition: [['legendary', 2]] },
 };
+const ALLOWED_RARITIES = new Set(Object.values(TIERS).flatMap((t) => t.composition.map(([r]) => r)));
 const TIER_NAMES = Object.keys(TIERS);
 const SHOP_IDS = Object.keys(ITEMS).filter((id) => ITEMS[id].source === 'shop');
 const currentSlot = (tier = 'fast') => Math.floor(Date.now() / TIERS[tier].ms);
@@ -141,11 +144,25 @@ async function ensureTier(guildId, tier) {
 }
 
 /**
+ * Rotaciones vigentes de ANTES de v7.14 que aún traen objetos comunes/poco comunes/raros: se retiran (se borran sus tarjetas del canal y
+ * la rotación) para que se cree enseguida la nueva solo con épicos/legendarios. No afecta a objetos ya comprados (están en los inventarios).
+ */
+async function purgeStale(client, guildId) {
+  const stale = (await ExpShopRotation.find({ guildId, endsAt: { $gt: new Date() } })).filter((rot) => rot.items.some((i) => !ALLOWED_RARITIES.has(ITEMS[i.itemId]?.rarity)));
+  for (const rot of stale) {
+    if (rot.published) await deleteMessages(client, rot.channelId, [rot.headerMessageId, ...rot.items.map((i) => i.messageId)]);
+    await ExpShopRotation.deleteOne({ _id: rot._id });
+    console.log(`[tienda-exp] rotación antigua retirada (${rot.tier} #${rot.slot}): solo se venden épicos y legendarios`);
+  }
+}
+
+/**
  * Garantiza que existan las rotaciones vigentes de AMBOS niveles (cada una caduca por su cuenta: 12 h y 24 h) y, si hay canal
  * configurado, que el panel esté publicado. El panel solo se vuelve a publicar cuando algún nivel rota (o con force).
  * Un nivel que no rotó conserva sus objetos, su stock y sus compradores.
  */
 async function ensureRotation(client, guildId, { publish = true, force = false, announce = false } = {}) {
+  await withLock(guildId, () => purgeStale(client, guildId)).catch((e) => console.error('[tienda-exp] limpieza:', e.message));
   const res = Object.fromEntries(await Promise.all(TIER_NAMES.map(async (tier) => [tier, await ensureTier(guildId, tier)])));
   const rots = { fast: res.fast.rot, slow: res.slow.rot };
   const anyNew = res.fast.created || res.slow.created;
@@ -250,4 +267,4 @@ async function purchase(interaction, rotId, itemId) {
   return eph('expShop.bought', { item: itemLabel(interaction.lang, itemId, item.maxUses) });
 }
 
-module.exports = { ensureRotation, tick, removePanel, purchase, buildHeader, currentSlot, pickItems, TIERS };
+module.exports = { purgeStale, ensureRotation, tick, removePanel, purchase, buildHeader, currentSlot, pickItems, TIERS };

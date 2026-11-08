@@ -13,7 +13,7 @@ const itemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// Una rotación = el escaparate de UN nivel: 'fast' (común, poco común, raro: cada 12 h) o 'slow' (épico y legendario: cada 24 h).
+// Una rotación = el escaparate de UN nivel: 'fast' (épicos: cada 12 h) o 'slow' (legendarios: cada 24 h). Antes de v7.14 fast eran común/poco común/raro.
 // Cada nivel tiene su propia cuenta de franjas y rota por su cuenta. (Las rotaciones antiguas, sin `tier`, mezclaban todo y caducan solas.)
 const expShopRotationSchema = new mongoose.Schema(
   {

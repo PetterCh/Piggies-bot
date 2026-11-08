@@ -1,5 +1,11 @@
 # 🪙 Coinks Bot v7.4
 
+## Novedades v7.14 — leaderboard mensual y tienda rotativa premium
+
+- **Leaderboard por Coinks ganados en el mes:** campo nuevo `User.monthlyCoinks` (opcional, por defecto 0; los usuarios existentes no necesitan migración). Suma lo ganado en expediciones y premios de cajas, sorteos y juegos; **no cuentan** reembolsos, regalos de admin, transferencias, airdrops ni ventas de objetos. El día 1 (tras cerrar la temporada y dar los roles) solo `monthlyCoinks` vuelve a 0: **`coinks`, equipo, inventario y NFTs no se tocan nunca**. Al arrancar por primera vez se rellena el mes en curso desde expediciones y el libro contable (migración `002-monthly.js`, una sola vez).
+- **Tienda rotativa solo épicos y legendarios:** 3 épicos nuevos cada 12 h y 2 legendarios cada 24 h, **1 unidad por objeto** y 1 por persona. Las rotaciones antiguas con objetos comunes/poco comunes/raros se retiran solas al arrancar (se borran sus tarjetas y se publica la nueva). Los objetos ya comprados siguen en los inventarios.
+- Colección nueva `botmetas` (clave `lbMonth`: mes del contador). Sin índices nuevos.
+
 ## Novedades v7.13 — 🕹️ Web interactiva de Piggies (módulo independiente)
 
 - **`/play/<id>`** (`routes/webview.js`): lee `public/piggies/metadata/<id>.json` y devuelve una página ligera con `<canvas>`: animación IDLE (frames 1–4), caminar con **WASD / flechas** (frames 5–12, botones táctiles en móvil) y botón **Comer** (frames 13–16; también tecla E). Hoja de 4×4 frames de 91×100 (`public/piggies/sprite-config.json`).

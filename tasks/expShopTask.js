@@ -11,7 +11,7 @@ function start(client) {
   };
   setTimeout(run, 10_000); // al arrancar, repone el escaparate si el bot estuvo apagado en un cambio de franja
   setInterval(run, config.expShop.checkIntervalMs);
-  console.log(`[tasks] Tienda de expedición rotativa activa (común/poco común/raro cada ${config.expShop.rotationHours} h · épico/legendario cada ${config.expShop.slowRotationHours} h)`);
+  console.log(`[tasks] Tienda de expedición rotativa activa (épicos cada ${config.expShop.rotationHours} h · legendarios cada ${config.expShop.slowRotationHours} h)`);
 }
 
 module.exports = { start };
