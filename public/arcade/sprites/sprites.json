@@ -1,0 +1,26 @@
+{
+  "pig": {
+    "frames": 1,
+    "fps": 8
+  },
+  "win": {
+    "frames": 1,
+    "fps": 8
+  },
+  "lose": {
+    "frames": 1,
+    "fps": 8
+  },
+  "tileClosed": {
+    "frames": 1
+  },
+  "tileCoin": {
+    "frames": 1
+  },
+  "tileBomb": {
+    "frames": 1
+  },
+  "crashBg": {
+    "frames": 1
+  }
+}

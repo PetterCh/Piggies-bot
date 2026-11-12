@@ -35,6 +35,7 @@ const names = {
 
 // descripción en español (tal como está en el código) -> inglés
 const descriptions = {
+  'Abre el Panel Arcade (Piggy Crash, Buscaminas…) con tu enlace personal': 'Open the Arcade Panel (Piggy Crash, Mines…) with your personal link',
   'Mira un Piggie y juega con él en la web': 'View a Piggie and play with it on the web',
   'ID del Piggie (ej. 150)': 'Piggie ID (e.g. 150)',
   '(Admin) Liga de Ballenas: panel, exclusiones y roles por puesto': '(Admin) Whale League: panel, exclusions and rank roles',

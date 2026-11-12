@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Piggy Arcade</title><meta name="robots" content="noindex">
+<link rel="icon" href="data:,"><link rel="stylesheet" href="arcade.css">
+</head><body>
+<header id="top">
+  <div class="who"><img id="avatar" alt="" hidden><span id="uname">…</span></div>
+  <div class="bal">🪙 <b id="balance">—</b></div>
+</header>
+<nav id="tabs">
+  <button data-tab="crash" class="on">🚀 <span data-i="tabCrash"></span></button>
+  <button data-tab="mines">💣 <span data-i="tabMines"></span></button>
+  <button data-tab="lb">🏆 <span data-i="tabLb"></span></button>
+</nav>
+<main>
+  <div id="authwall" hidden><p>🐷 <span data-i="needLogin"></span></p></div>
+  <div id="toast" hidden></div>
+
+  <!-- ===== PIGGY CRASH ===== -->
+  <section id="crash" class="panel">
+    <canvas id="cv" width="640" height="360"></canvas>
+    <div class="ctrl">
+      <label><span data-i="bet"></span><input id="cBet" type="number" inputmode="numeric" min="10" step="1" value="100"></label>
+      <div class="quick" data-for="cBet"><button data-q="min">MIN</button><button data-q="half">½</button><button data-q="x2">×2</button><button data-q="max">MAX</button></div>
+      <button id="cGo" class="main go"></button>
+      <button id="cCash" class="main cash" hidden></button>
+    </div>
+    <p class="hint" id="cHint"></p>
+  </section>
+
+  <!-- ===== BUSCAMINAS ===== -->
+  <section id="mines" class="panel" hidden>
+    <div id="mStats"><div><small data-i="mult"></small><b id="mMult">1.00x</b></div><div><small data-i="next"></small><b id="mNext">—</b></div><div><small data-i="cashNow"></small><b id="mCash">—</b></div></div>
+    <div id="board"></div>
+    <div class="ctrl">
+      <label><span data-i="bet"></span><input id="mBet" type="number" inputmode="numeric" min="10" step="1" value="100"></label>
+      <div class="quick" data-for="mBet"><button data-q="min">MIN</button><button data-q="half">½</button><button data-q="x2">×2</button><button data-q="max">MAX</button></div>
+      <label><span data-i="bombs"></span><input id="mBombs" type="number" inputmode="numeric" min="1" max="24" step="1" value="3"></label>
+      <div class="quick" id="bombQuick"><button data-b="1">1</button><button data-b="3">3</button><button data-b="5">5</button><button data-b="10">10</button><button data-b="24">24</button></div>
+      <button id="mGo" class="main go"></button>
+      <button id="mCashBtn" class="main cash" hidden></button>
+    </div>
+    <p class="hint" id="mHint"></p>
+  </section>
+
+  <!-- ===== LEADERBOARD ===== -->
+  <section id="lb" class="panel" hidden>
+    <div class="seg" id="lbType"><button data-v="mult" class="on" data-i="lbMult"></button><button data-v="profit" data-i="lbProfit"></button></div>
+    <div class="seg" id="lbRange"><button data-v="month" class="on" data-i="lbMonth"></button><button data-v="all" data-i="lbAll"></button></div>
+    <ol id="lbList"></ol>
+  </section>
+</main>
+<script src="arcade.js"></script>
+</body></html>

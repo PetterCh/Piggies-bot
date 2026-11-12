@@ -423,6 +423,11 @@ module.exports = {
   },
 
   // ---------------- LOOTBOXES ----------------
+  arcade: {
+    noWeb: "⚠️ El Arcade no está configurado todavía (falta la URL pública del servicio). Avisa a un admin.",
+    intro: "🕹️ **Panel Arcade** — tu enlace personal (válido 10 minutos, de un solo uso). **No lo compartas**: da acceso a tu saldo de Coinks.\nTodas las apuestas se validan en el servidor con tus Coinks reales. Juega con cabeza. 🐷",
+    button: "🚀 Abrir Arcade",
+  },
   piggyWeb: {
     notFound: "❌ No encontré el Piggie **#{id}**. Revisa el número.",
     noWeb: "⚠️ La web de Piggies no está configurada todavía (falta la URL pública del servicio). Avisa a un admin.",

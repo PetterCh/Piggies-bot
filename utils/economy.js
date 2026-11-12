@@ -41,7 +41,7 @@ const getUser = (discordId) => upsertUser(discordId, {});
 const _credit = (discordId, amount, { earned = false } = {}) => upsertUser(discordId, { $inc: earned ? { coinks: amount, monthlyCoinks: amount } : { coinks: amount } });
 
 // Qué abonos cuentan como "ganados" para el leaderboard mensual: no los reembolsos ni los regalos de admin (transferencias y airdrops no pasan por addCoinks).
-const countsAsEarned = (type) => !/refund/.test(type || '') && type !== 'admin_give';
+const countsAsEarned = (type) => !/refund|^arcade/.test(type || '') && type !== 'admin_give'; // el Arcade (apuestas) no cuenta para el ranking mensual
 
 async function _debit(discordId, amount) {
   // El filtro `coinks >= amount` hace la comprobación de saldo y el descuento en UNA sola operación.

@@ -1,5 +1,14 @@
 # 🪙 Coinks Bot v7.4
 
+## Novedades v7.15 — 🕹️ Panel Arcade (Piggy Crash, Buscaminas, Ranking)
+
+- **`/arcade`** genera un enlace personal **firmado (HMAC-SHA256), de un solo uso y válido 10 min**; solo lo ve quien ejecuta el comando. Al abrirlo, el servidor lo canjea por una cookie de sesión firmada (HttpOnly, SameSite=Lax, 3 h) y redirige a `/arcade/`. El ID de Discord sale **solo de la firma**: cambiar la URL, el cuerpo o la cookie lo invalida. Las POST exigen la cabecera `X-Arcade` y un `Origin` propio (anti-CSRF) y hay límite de peticiones.
+- **Todo en el servidor:** apuesta (`removeCoinks` atómico, una partida abierta por usuario con índice único parcial), punto de explosión, posición de bombas, multiplicadores y premios (`addCoinks` solo a quien consigue cambiar el estado de la partida con un `findOneAndUpdate` condicionado; un cobro doble paga una vez). El cliente nunca recibe el punto de explosión ni las bombas hasta que la partida termina. `reconcile()` (cada 5 min) abona premios pendientes y reembolsa apuestas cobradas cuya partida quedó a medias.
+- **Matemática** (`web/arcade/math.js`): Crash con RTP 96 % en cualquier momento de retirada (simulado: 95.9–96.3 %), 4 % de explosión instantánea, máx. 100x; Buscaminas 5×5 con 1–24 bombas, RTP 96 %. Límites configurables con variables `ARCADE_*` (ver `.env.example`): apuesta 10–5,000 y premio máx. 50,000 por partida. El Arcade **no** cuenta para el ranking mensual del bot.
+- **Web** (`public/arcade/`): barra fija con usuario y saldo (se actualiza cada 3 s y tras cada acción), pestañas Crash / Buscaminas / Ranking (mejor multiplicador o mayor ganancia, este mes o histórico).
+- **Tus sprites:** pon los PNG en `public/arcade/sprites/` (`piggy-fly.png`, `win.png`, `lose.png`, `tile-closed.png`, `tile-coin.png`, `tile-bomb.png`, opcional `crash-bg.png`). Sin archivo = emoji/color de respaldo. Animaciones como tira horizontal declarada en `sprites.json`. Detalles en `public/arcade/sprites/README.md`.
+- Archivos nuevos: `commands/games/arcade.js`, `routes/arcade.js`, `web/arcade/{math,auth,service}.js`, `models/ArcadeGame.js`, `public/arcade/*`. Cambios menores: `web/server.js` (montaje), `utils/economy.js` (el Arcade no suma al ranking mensual), locales. **Requiere `npm run deploy`** (comando nuevo).
+
 ## Novedades v7.14 — leaderboard mensual y tienda rotativa premium
 
 - **Leaderboard por Coinks ganados en el mes:** campo nuevo `User.monthlyCoinks` (opcional, por defecto 0; los usuarios existentes no necesitan migración). Suma lo ganado en expediciones y premios de cajas, sorteos y juegos; **no cuentan** reembolsos, regalos de admin, transferencias, airdrops ni ventas de objetos. El día 1 (tras cerrar la temporada y dar los roles) solo `monthlyCoinks` vuelve a 0: **`coinks`, equipo, inventario y NFTs no se tocan nunca**. Al arrancar por primera vez se rellena el mes en curso desde expediciones y el libro contable (migración `002-monthly.js`, una sola vez).

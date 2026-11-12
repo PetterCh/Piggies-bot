@@ -416,6 +416,11 @@ module.exports = {
     cancelled: "✅ Giveaway cancelled and entries refunded.",
   },
 
+  arcade: {
+    noWeb: "⚠️ The Arcade isn't configured yet (the service's public URL is missing). Let an admin know.",
+    intro: "🕹️ **Arcade Panel** — your personal link (valid for 10 minutes, single use). **Don't share it**: it gives access to your Coinks balance.\nEvery bet is validated on the server with your real Coinks. Play responsibly. 🐷",
+    button: "🚀 Open Arcade",
+  },
   piggyWeb: {
     notFound: "❌ I couldn't find Piggie **#{id}**. Check the number.",
     noWeb: "⚠️ The Piggies web isn't configured yet (the service's public URL is missing). Let an admin know.",
