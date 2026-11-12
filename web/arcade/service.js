@@ -10,6 +10,7 @@ const ArcadeGame = require('../../models/ArcadeGame');
 const { addCoinks, removeCoinks, InsufficientFundsError } = require('../../utils/economy');
 const { zonedMonthStart } = require('../../utils/month');
 const M = require('./math');
+const arcadeLog = require('../../services/arcadeLog');
 
 const env = (k, d) => (Number(process.env[k]) > 0 ? Number(process.env[k]) : d);
 const LIMITS = {
@@ -60,6 +61,7 @@ async function finishLost(doc) {
     { $set: { status: 'lost', open: false, endedAt: new Date(), cashMult: 0, payout: 0, profit: -doc.bet, paid: true } },
     { new: true }
   ).select(SEL);
+  if (res) arcadeLog.announce(res); // aviso en el canal de logs (sin esperar, no rompe nada si falla)
   return res || reload(doc._id);
 }
 
@@ -71,6 +73,7 @@ async function finishCashed(doc, mult, extraFilter = {}) {
     { new: true }
   ).select(SEL);
   if (!res) return null; // otro proceso cambió la partida antes: quien llama la vuelve a leer
+  arcadeLog.announce(res);
   return settle(res);
 }
 
@@ -196,6 +199,7 @@ async function minesReveal(user, idx) {
       { $set: { status: 'lost', open: false, endedAt: new Date(), cashMult: 0, payout: 0, profit: -doc.bet, paid: true, hit: idx } },
       { new: true }
     ).select(SEL);
+    if (res) arcadeLog.announce(res);
     return minesView(res || (await reload(doc._id)));
   }
   let updated = await ArcadeGame.findOneAndUpdate({ _id: doc._id, open: true, status: 'active', revealed: { $ne: idx } }, { $push: { revealed: idx } }, { new: true }).select(SEL);

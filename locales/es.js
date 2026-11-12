@@ -428,6 +428,20 @@ module.exports = {
     intro: "🕹️ **Panel Arcade** — tu enlace personal (válido 10 minutos, de un solo uso). **No lo compartas**: da acceso a tu saldo de Coinks.\nTodas las apuestas se validan en el servidor con tus Coinks reales. Juega con cabeza. 🐷",
     button: "🚀 Abrir Arcade",
   },
+  arcadePanel: {
+    title: "🕹️ Panel Arcade",
+    desc: "Juega **Piggy Crash** y **Buscaminas** con tus Coinks.\n🌐 **Abrir Arcade** abre la web.\n🔑 **Mi enlace personal** te da tu acceso privado (10 min, un solo uso; solo lo ves tú).",
+    openWeb: "🌐 Abrir Arcade",
+    myLink: "🔑 Mi enlace personal",
+    posted: "✅ Panel publicado en este canal.",
+  },
+  arcadeLog: {
+    game: { crash: "Piggy Crash", mines: "Buscaminas" },
+    winTitle: "{emoji} ¡{user} ganó en {game}!",
+    win: "**{user}** ganó **+{coinks} Coinks** en **{game}** (apostó {bet}, cobró {payout} a x{mult}).",
+    loseTitle: "{emoji} {user} perdió en {game}",
+    lose: "**{user}** perdió **{coinks} Coinks** en **{game}**.",
+  },
   piggyWeb: {
     notFound: "❌ No encontré el Piggie **#{id}**. Revisa el número.",
     noWeb: "⚠️ La web de Piggies no está configurada todavía (falta la URL pública del servicio). Avisa a un admin.",

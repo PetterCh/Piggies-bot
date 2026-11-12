@@ -12,6 +12,7 @@ module.exports = {
   once: true,
   execute(readyClient) {
     console.log(`✅ Conectado como ${readyClient.user.tag}`);
+    require('../services/arcadeLog').setClient(readyClient); // avisos del Arcade en el canal de logs
     nftSyncTask.start(readyClient);
     tokenOwnersTask.start(readyClient);
     expeditionTask.start(readyClient);

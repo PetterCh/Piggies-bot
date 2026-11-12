@@ -421,6 +421,20 @@ module.exports = {
     intro: "🕹️ **Arcade Panel** — your personal link (valid for 10 minutes, single use). **Don't share it**: it gives access to your Coinks balance.\nEvery bet is validated on the server with your real Coinks. Play responsibly. 🐷",
     button: "🚀 Open Arcade",
   },
+  arcadePanel: {
+    title: "🕹️ Arcade Panel",
+    desc: "Play **Piggy Crash** and **Mines** with your Coinks.\n🌐 **Open Arcade** opens the website.\n🔑 **My personal link** gives you your private access (10 min, single use; only you can see it).",
+    openWeb: "🌐 Open Arcade",
+    myLink: "🔑 My personal link",
+    posted: "✅ Panel posted in this channel.",
+  },
+  arcadeLog: {
+    game: { crash: "Piggy Crash", mines: "Mines" },
+    winTitle: "{emoji} {user} won at {game}!",
+    win: "**{user}** won **+{coinks} Coinks** at **{game}** (bet {bet}, cashed out {payout} at x{mult}).",
+    loseTitle: "{emoji} {user} lost at {game}",
+    lose: "**{user}** lost **{coinks} Coinks** at **{game}**.",
+  },
   piggyWeb: {
     notFound: "❌ I couldn't find Piggie **#{id}**. Check the number.",
     noWeb: "⚠️ The Piggies web isn't configured yet (the service's public URL is missing). Let an admin know.",

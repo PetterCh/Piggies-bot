@@ -424,3 +424,9 @@ npm start
 - Roles por rasgo: requieren contratos ERC721Enumerable y metadatos accesibles. Ronin se trata como EVM. Usa RPC propios (Alchemy, Infura…).
 - Las URIs de metadatos las define el contrato: el bot hace peticiones HTTP a ellas. Registra solo colecciones en las que confíes.
 - Los premios en Coinks de sorteos se pagan como máximo una vez por ganador, incluso si el bot se reinicia a mitad del reparto (en un caso extremo podría quedar sin pagar uno; el error se registra en consola).
+
+## v7.16 — Panel fijo del Arcade + avisos de resultados
+
+- `/arcade-panel` (admin): publica en el canal un panel permanente con un botón **Link** que abre `https://tu-url/arcade/` y un botón **🔑 Mi enlace personal** que entrega a cada usuario su enlace firmado (solo lo ve él). Tras subirlo ejecuta `npm run deploy`.
+- Avisos automáticos de **Piggy Crash** y **Buscaminas** (nombre + Coinks ganados/perdidos) en el canal de `/set-logs-channel`. Variable opcional `ARCADE_LOG_MIN` (por defecto 0 = todas las partidas). Se envían una sola vez por partida y nunca retrasan ni rompen el juego.
+- Sin cambios en la base de datos ni paquetes nuevos.
